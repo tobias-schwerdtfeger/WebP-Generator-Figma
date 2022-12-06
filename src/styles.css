@@ -1,0 +1,16 @@
+.preview {
+    height: 150px;
+    max-width: 256px;
+    object-fit: contain;
+}
+
+.preview_no_selection {
+    border: dotted lightgrey;
+    border-radius: 16px;
+    height: 150px;
+    width: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
