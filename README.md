@@ -1,8 +1,8 @@
 # WebP Generator Plugin for Figma
 
-***Export WebP files from Figma for Web or Android***
-
 ![Cover](figma/Cover_Art.png)
+
+***Export WebP files from Figma for Web or Android***
 
 ### Features
 - Export any image as WebP
