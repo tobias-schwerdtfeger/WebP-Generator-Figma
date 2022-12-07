@@ -1,5 +1,4 @@
 {
-  "name": "webp-android",
   "scripts": {
     "build": "build-figma-plugin --typecheck --minify",
     "watch": "build-figma-plugin --typecheck --watch",

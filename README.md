@@ -34,4 +34,4 @@ image \
     image_4x.webp
 ```
 
-Check out the plugin at [Figma](). 
+Check out the plugin at [Figma](https://www.figma.com/community/plugin/1181873200384736932). 
