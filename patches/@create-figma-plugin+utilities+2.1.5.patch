@@ -1,0 +1,14 @@
+diff --git a/node_modules/@create-figma-plugin/utilities/lib/events.js b/node_modules/@create-figma-plugin/utilities/lib/events.js
+index da6d5d0..5abbd7a 100644
+--- a/node_modules/@create-figma-plugin/utilities/lib/events.js
++++ b/node_modules/@create-figma-plugin/utilities/lib/events.js
+@@ -41,6 +41,9 @@ if (typeof window === 'undefined') {
+ }
+ else {
+     window.onmessage = function (event) {
++        if (!event.data.hasOwnProperty("pluginMessage")) {
++            return;
++        }
+         const [name, ...args] = event.data.pluginMessage;
+         invokeEventHandler(name, args);
+     };

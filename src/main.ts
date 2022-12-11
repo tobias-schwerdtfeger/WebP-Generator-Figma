@@ -1,12 +1,11 @@
 import { emit, on, showUI } from "@create-figma-plugin/utilities";
+import { RenderedImage, Settings } from "./types";
 import {
-  RenderedImage,
   RenderRequestHandler,
   RenderResultHandler,
   SaveSettings,
   SelectionChanged,
-  Settings,
-} from "./types";
+} from "./events";
 
 function exportSize(size: number): ExportSettings {
   return {

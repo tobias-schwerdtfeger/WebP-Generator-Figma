@@ -13,19 +13,16 @@ import {
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { emit, on } from "@create-figma-plugin/utilities";
+import { RenderedImage, RenderedImageScale, Settings } from "./types";
+import JSZip from "jszip";
+import styles from "./styles.css";
 import {
-  fileNameAndroid,
-  fileNameWeb,
-  RenderedImage,
-  RenderedImageScale,
   RenderRequestHandler,
   RenderResultHandler,
   SaveSettings,
   SelectionChanged,
-  Settings,
-} from "./types";
-import JSZip from "jszip";
-import styles from "./styles.css";
+} from "./events";
+import { fileNameAndroid, fileNameWeb } from "./utils";
 
 function createZip(
   b64WebP: { data: string; scale: RenderedImageScale }[],
