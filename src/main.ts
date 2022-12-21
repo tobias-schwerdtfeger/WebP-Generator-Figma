@@ -1,5 +1,5 @@
 import { emit, on, showUI } from "@create-figma-plugin/utilities";
-import { RenderedImage, Settings } from "./types";
+import { RenderedImage, RenderedImageScale, Settings } from "./types";
 import {
   RenderRequestHandler,
   RenderResultHandler,
@@ -18,27 +18,21 @@ function exportSize(size: number): ExportSettings {
 }
 
 export default function () {
-  on<RenderRequestHandler>("RENDER_REQUEST", () => {
+  on<RenderRequestHandler>("RENDER_REQUEST", (scales: RenderedImageScale[]) => {
     new Promise(() => {
       if (figma.currentPage.selection.length > 0) {
         const node = figma.currentPage.selection[0];
 
-        Promise.all([
-          node.exportAsync(exportSize(1)),
-          node.exportAsync(exportSize(1.5)),
-          node.exportAsync(exportSize(2)),
-          node.exportAsync(exportSize(3)),
-          node.exportAsync(exportSize(4)),
-        ]).then((pngs) => {
-          const scales = [1, 1.5, 2, 3, 4];
-
-          emit<RenderResultHandler>(
-            "RENDER_RESULT",
-            scales.map((scale, index) => {
-              return { scale: scale, image: pngs[index] } as RenderedImage;
-            })
-          );
-        });
+        Promise.all(scales.map((s) => node.exportAsync(exportSize(s)))).then(
+          (pngs) => {
+            emit<RenderResultHandler>(
+              "RENDER_RESULT",
+              scales.map((scale, index) => {
+                return { scale: scale, image: pngs[index] } as RenderedImage;
+              })
+            );
+          }
+        );
       } else {
         emit<SelectionChanged>("SELECTION_CHANGED", undefined, undefined);
       }
@@ -65,17 +59,29 @@ export default function () {
     }
   });
 
-  //figma.clientStorage.deleteAsync("settings")
+  // figma.clientStorage.deleteAsync("settings")
 
-  figma.clientStorage
-    .getAsync("settings")
-    .then((settings: Settings | undefined) => {
-      if (settings === undefined) {
-        showUI({ width: 320, height: 320 }, {
-          useAndroidExport: false,
-        } as Settings);
-      } else {
-        showUI({ width: 320, height: 320 }, settings);
-      }
-    });
+  figma.clientStorage.getAsync("settings").then((settings: any | undefined) => {
+    // never had the plugin before
+    if (settings === undefined) {
+      settings = {};
+    }
+    // V0
+    if (!("useAndroidExport" in settings)) {
+      settings["useAndroidExport"] = false;
+    }
+    // V1
+    if (!("selectedExportScales" in settings)) {
+      // if android export is selected, preselect 1.5 scale
+      const androidScale15 = settings["useAndroidExport"];
+      settings["selectedExportScales"] = [
+        [1, true],
+        [1.5, androidScale15],
+        [2, true],
+        [3, true],
+        [4, true],
+      ];
+    }
+    showUI({ width: 320, height: 336 }, settings);
+  });
 }

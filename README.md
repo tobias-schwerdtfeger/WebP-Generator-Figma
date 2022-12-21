@@ -29,6 +29,7 @@ or for web:
 ```
 image \
     image_1x.webp
+    image_1_5x.webp
     image_2x.webp
     image_3x.webp
     image_4x.webp

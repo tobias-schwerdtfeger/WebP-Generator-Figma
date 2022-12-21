@@ -25,17 +25,14 @@ export function fileNameAndroid(
   return `drawable-${suffix}/${name}`;
 }
 
-export function fileNameWeb(
-  scale: RenderedImageScale,
-  name: string
-): string | undefined {
-  if (scale == 1.5) {
-    return undefined;
-  }
+export function fileNameWeb(scale: RenderedImageScale, name: string): string {
   let suffix;
   switch (scale) {
     case 1:
       suffix = "1x";
+      break;
+    case 1.5:
+      suffix = "1_5x";
       break;
     case 2:
       suffix = "2x";

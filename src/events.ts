@@ -1,5 +1,5 @@
 import { EventHandler } from "@create-figma-plugin/utilities";
-import { RenderedImage, Settings } from "./types";
+import { RenderedImage, RenderedImageScale, Settings } from "./types";
 
 export interface SelectionChanged extends EventHandler {
   name: "SELECTION_CHANGED";
@@ -8,7 +8,7 @@ export interface SelectionChanged extends EventHandler {
 
 export interface RenderRequestHandler extends EventHandler {
   name: "RENDER_REQUEST";
-  handler: () => void;
+  handler: (scales: RenderedImageScale[]) => void;
 }
 
 export interface RenderResultHandler extends EventHandler {

@@ -5,6 +5,9 @@ export type RenderedImage = {
   image: Uint8Array;
 };
 
+export type SettingsExportScales = [RenderedImageScale, boolean];
+
 export type Settings = {
   useAndroidExport: boolean;
+  selectedExportScales: SettingsExportScales[];
 };

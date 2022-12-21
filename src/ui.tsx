@@ -9,9 +9,13 @@ import {
   render,
   Textbox,
   VerticalSpace,
+  Stack,
+  Inline,
+  Divider,
+  Disclosure,
 } from "@create-figma-plugin/ui";
 import { h } from "preact";
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
 import { emit, on } from "@create-figma-plugin/utilities";
 import { RenderedImage, RenderedImageScale, Settings } from "./types";
 import JSZip from "jszip";
@@ -34,18 +38,23 @@ function createZip(
     const fileName = isAndroidExport
       ? fileNameAndroid(scale, baseName)
       : fileNameWeb(scale, baseName);
-    if (fileName !== undefined) {
-      zip.file(`${fileName}.webp`, data, { base64: true });
-    }
+
+    zip.file(`${fileName}.webp`, data, { base64: true });
   });
   return zip;
 }
 
 async function downloadZip(zip: JSZip, name: string) {
-  const base64Zip = await zip.generateAsync({ type: "base64" });
+  const b64Zip = await zip.generateAsync({ type: "base64" });
+  downloadFile(b64Zip, name, "zip");
+}
+
+function downloadFile(b64Data: string, name: string, type: "webp" | "zip") {
   const link = document.createElement("a");
   link.download = name;
-  link.href = "data:application/zip;base64," + base64Zip;
+  link.href = `data:${
+    type == "webp" ? "image" : "application"
+  }/${type};base64,${b64Data}`;
   link.click();
 }
 
@@ -53,15 +62,39 @@ function Preview(settings: Settings) {
   const [useAndroidExport, setUseAndroidExport] = useState(
     settings.useAndroidExport
   );
+  const [exportScales, setExportScales] = useState(
+    new Map(settings.selectedExportScales)
+  );
   useEffect(() => {
-    emit<SaveSettings>("SAVE_SETTINGS", { useAndroidExport: useAndroidExport });
-  }, [useAndroidExport]);
+    emit<SaveSettings>("SAVE_SETTINGS", {
+      useAndroidExport: useAndroidExport,
+      selectedExportScales: Array.from(exportScales, ([scale, checked]) => [
+        scale,
+        checked,
+      ]),
+    });
+  }, [useAndroidExport, exportScales]);
 
   const [fileName, setFileName] = useState("");
   const [previewImage, setPreviewImage] = useState<Uint8Array | undefined>(
     undefined
   );
   const [inProgress, setInProgress] = useState(false);
+
+  function exportButtonDisabled() {
+    let anyChecked = false;
+    exportScales.forEach((checked, _) => {
+      if (checked) {
+        anyChecked = true;
+      }
+    });
+    return (
+      previewImage == undefined ||
+      fileName.length == 0 ||
+      inProgress ||
+      !anyChecked
+    );
+  }
 
   useEffect(() => {
     const deleteSelectionChangedHandler = on<SelectionChanged>(
@@ -92,6 +125,7 @@ function Preview(settings: Settings) {
             const ctx = canvas.getContext("2d");
             const blob = new Blob([rimg.image], { type: "image/png" });
             const image = new Image();
+
             image.src = URL.createObjectURL(blob);
             image.onload = async () => {
               canvas.width = image.width;
@@ -103,7 +137,11 @@ function Preview(settings: Settings) {
               });
 
               // finally generate zip and download
-              if (b64WebP.length == rimages.length) {
+              if (rimages.length == 1 && b64WebP.length == 1) {
+                downloadFile(b64WebP[0].data, name, "webp");
+
+                setInProgress(false);
+              } else if (b64WebP.length == rimages.length) {
                 await downloadZip(createZip(b64WebP, name, android), name);
 
                 setInProgress(false);
@@ -137,8 +175,11 @@ function Preview(settings: Settings) {
 
   const clickDownloadZip = useCallback(() => {
     setInProgress(true);
-    emit<RenderRequestHandler>("RENDER_REQUEST");
-  }, []);
+    const exp = Array.from(exportScales.entries())
+      .filter(([_, toggled]) => toggled)
+      .map(([scale, _]) => scale);
+    emit<RenderRequestHandler>("RENDER_REQUEST", exp);
+  }, [exportScales]);
 
   let preview;
   if (previewImage !== undefined) {
@@ -154,6 +195,7 @@ function Preview(settings: Settings) {
     );
   }
 
+  const [showPreferences, setShowPreferences] = useState(false);
   return (
     <Container space="medium">
       <VerticalSpace space="medium" />
@@ -165,24 +207,91 @@ function Preview(settings: Settings) {
         onInput={(event) => setFileName(event.currentTarget.value)}
         value={fileName}
       />
-      <VerticalSpace space="medium" />
+      <VerticalSpace space="small" />
       <Button
         fullWidth
         secondary
         loading={inProgress}
-        disabled={fileName.length == 0 || inProgress}
+        disabled={exportButtonDisabled()}
         onClick={() => clickDownloadZip()}
       >
         Export
       </Button>
-      <VerticalSpace space="small" />
-      <Checkbox
-        onChange={(event) => setUseAndroidExport(event.currentTarget.checked)}
-        value={useAndroidExport}
+      <VerticalSpace space="large" />
+      <Disclosure
+        onClick={(event) => {
+          setShowPreferences(!showPreferences);
+        }}
+        open={showPreferences}
+        title="Preferences"
       >
-        <Text>Export for Android</Text>
-      </Checkbox>
+        <VerticalSpace space="small" />
+        <Text>Resolution</Text>
+        <VerticalSpace space="small" />
+        <Inline space="small">
+          {ScaleExportToggle(
+            exportScales.get(1) ?? false,
+            1,
+            (scale, checked) => {
+              setExportScales((prev) => new Map([...prev, [scale, checked]]));
+            }
+          )}
+          {ScaleExportToggle(
+            exportScales.get(1.5) ?? false,
+            1.5,
+            (scale, checked) => {
+              setExportScales((prev) => new Map([...prev, [scale, checked]]));
+            }
+          )}
+          {ScaleExportToggle(
+            exportScales.get(2) ?? false,
+            2,
+            (scale, checked) => {
+              setExportScales((prev) => new Map([...prev, [scale, checked]]));
+            }
+          )}
+          {ScaleExportToggle(
+            exportScales.get(3) ?? false,
+            3,
+            (scale, checked) => {
+              setExportScales((prev) => new Map([...prev, [scale, checked]]));
+            }
+          )}
+          {ScaleExportToggle(
+            exportScales.get(4) ?? false,
+            4,
+            (scale, checked) => {
+              setExportScales(new Map(exportScales.set(scale, checked)));
+            }
+          )}
+        </Inline>
+        <VerticalSpace space="small" />
+        <Divider />
+        <VerticalSpace space="small" />
+        <Checkbox
+          onChange={(event) => setUseAndroidExport(event.currentTarget.checked)}
+          value={useAndroidExport}
+        >
+          <Text>Export for Android</Text>
+        </Checkbox>
+      </Disclosure>
+      <VerticalSpace space="medium" />
     </Container>
+  );
+}
+
+function ScaleExportToggle(
+  checked: boolean,
+  scale: RenderedImageScale,
+  setScale: (scale: RenderedImageScale, checked: boolean) => void
+) {
+  return (
+    <Checkbox
+      onChange={(event) => setScale(scale, event.currentTarget.checked)}
+      value={checked}
+    >
+      <Text>{scale}x</Text>
+    </Checkbox>
   );
 }
 
