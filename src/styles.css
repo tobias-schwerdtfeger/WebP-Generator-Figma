@@ -14,3 +14,15 @@
     justify-content: center;
     flex-direction: column;
 }
+
+#donate {
+    display: flex;
+    align-items: center;
+    width: fit-content;
+    margin-left: auto;
+}
+
+#donate > img {
+    height: 24px;
+    padding-right: 8px;
+}

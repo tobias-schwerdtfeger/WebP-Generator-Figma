@@ -9,17 +9,17 @@ import {
   render,
   Textbox,
   VerticalSpace,
-  Stack,
   Inline,
   Divider,
   Disclosure,
 } from "@create-figma-plugin/ui";
 import { h } from "preact";
-import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
+import { useCallback, useEffect, useState } from "preact/hooks";
 import { emit, on } from "@create-figma-plugin/utilities";
 import { RenderedImage, RenderedImageScale, Settings } from "./types";
 import JSZip from "jszip";
 import styles from "./styles.css";
+import donateLogo from "./ko-fi-logo.png";
 import {
   RenderRequestHandler,
   RenderResultHandler,
@@ -219,7 +219,7 @@ function Preview(settings: Settings) {
       </Button>
       <VerticalSpace space="large" />
       <Disclosure
-        onClick={(event) => {
+        onClick={(_) => {
           setShowPreferences(!showPreferences);
         }}
         open={showPreferences}
@@ -275,6 +275,8 @@ function Preview(settings: Settings) {
           <Text>Export for Android</Text>
         </Checkbox>
       </Disclosure>
+      <VerticalSpace space="extraSmall" />
+      {DonateLogo()}
       <VerticalSpace space="medium" />
     </Container>
   );
@@ -292,6 +294,20 @@ function ScaleExportToggle(
     >
       <Text>{scale}x</Text>
     </Checkbox>
+  );
+}
+
+function DonateLogo() {
+  return (
+    <a
+      id={styles.donate}
+      href="https://ko-fi.com/webpgen"
+      target="_blank"
+      rel="noreferrer"
+    >
+      <img src={donateLogo} alt="Donate" />
+      Donate
+    </a>
   );
 }
 

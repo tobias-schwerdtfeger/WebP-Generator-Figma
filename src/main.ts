@@ -1,5 +1,5 @@
 import { emit, on, showUI } from "@create-figma-plugin/utilities";
-import { RenderedImage, RenderedImageScale, Settings } from "./types";
+import { RenderedImage, RenderedImageScale } from "./types";
 import {
   RenderRequestHandler,
   RenderResultHandler,
@@ -82,6 +82,6 @@ export default function () {
         [4, true],
       ];
     }
-    showUI({ width: 320, height: 336 }, settings);
+    showUI({ width: 320, height: 360 }, settings);
   });
 }
