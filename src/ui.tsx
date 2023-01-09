@@ -12,6 +12,7 @@ import {
   Inline,
   Divider,
   Disclosure,
+  Toggle,
 } from "@create-figma-plugin/ui";
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
@@ -65,15 +66,19 @@ function Preview(settings: Settings) {
   const [exportScales, setExportScales] = useState(
     new Map(settings.selectedExportScales)
   );
+  const [useOptimizedSize, setUseOptimizedSize] = useState<boolean>(
+    settings.useOptimizedSize
+  );
   useEffect(() => {
     emit<SaveSettings>("SAVE_SETTINGS", {
       useAndroidExport: useAndroidExport,
+      useOptimizedSize: useOptimizedSize,
       selectedExportScales: Array.from(exportScales, ([scale, checked]) => [
         scale,
         checked,
       ]),
     });
-  }, [useAndroidExport, exportScales]);
+  }, [useAndroidExport, exportScales, useOptimizedSize]);
 
   const [fileName, setFileName] = useState("");
   const [previewImage, setPreviewImage] = useState<Uint8Array | undefined>(
@@ -132,7 +137,9 @@ function Preview(settings: Settings) {
               canvas.height = image.height;
               ctx?.drawImage(image, 0, 0);
               b64WebP.push({
-                data: canvas.toDataURL("image/webp", 1.0).split(",")[1],
+                data: canvas
+                  .toDataURL("image/webp", useOptimizedSize ? 0.9 : 1.0)
+                  .split(",")[1],
                 scale: rimg.scale,
               });
 
@@ -225,6 +232,14 @@ function Preview(settings: Settings) {
         open={showPreferences}
         title="Preferences"
       >
+        <Text>Quality</Text>
+        <VerticalSpace space="small" />
+        <Toggle
+          onValueChange={(value) => setUseOptimizedSize(value)}
+          value={useOptimizedSize}
+        >
+          <Text>Optimized Size</Text>
+        </Toggle>
         <VerticalSpace space="small" />
         <Text>Resolution</Text>
         <VerticalSpace space="small" />
@@ -268,12 +283,12 @@ function Preview(settings: Settings) {
         <VerticalSpace space="small" />
         <Divider />
         <VerticalSpace space="small" />
-        <Checkbox
-          onChange={(event) => setUseAndroidExport(event.currentTarget.checked)}
+        <Toggle
+          onValueChange={(checked) => setUseAndroidExport(checked)}
           value={useAndroidExport}
         >
           <Text>Export for Android</Text>
-        </Checkbox>
+        </Toggle>
       </Disclosure>
       <VerticalSpace space="extraSmall" />
       {DonateLogo()}

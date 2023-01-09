@@ -9,5 +9,6 @@ export type SettingsExportScales = [RenderedImageScale, boolean];
 
 export type Settings = {
   useAndroidExport: boolean;
+  useOptimizedSize: boolean;
   selectedExportScales: SettingsExportScales[];
 };

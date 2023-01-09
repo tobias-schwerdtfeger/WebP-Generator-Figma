@@ -28,11 +28,11 @@
   },
   "figma-plugin": {
     "editorType": [
-      "figma"
+      "figma", "figjam"
     ],
     "containsWidget": false,
     "id": "1181873200384736932",
-    "name": "WebP Generator",
+    "name": "WebP Exporter",
     "main": "src/main.ts",
     "ui": "src/ui.tsx"
   }

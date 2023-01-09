@@ -60,6 +60,8 @@ export default function () {
   });
 
   // figma.clientStorage.deleteAsync("settings")
+  //
+  // return;
 
   figma.clientStorage.getAsync("settings").then((settings: any | undefined) => {
     // never had the plugin before
@@ -81,6 +83,10 @@ export default function () {
         [3, true],
         [4, true],
       ];
+    }
+    // V2
+    if (!("useOptimizedSize" in settings)) {
+      settings["useOptimizedSize"] = true;
     }
     showUI({ width: 320, height: 360 }, settings);
   });
