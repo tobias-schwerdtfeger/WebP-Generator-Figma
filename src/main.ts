@@ -47,7 +47,7 @@ export default function () {
     if (figma.currentPage.selection.length > 0) {
       const node = figma.currentPage.selection[0];
       const regexName = /[^a-zA-Z0-9]+/g;
-      const newName = node.name.replace(regexName, "_").toLowerCase();
+      const newName = node.name.replace(regexName, "-").toLowerCase();
 
       emit<SelectionChanged>(
         "SELECTION_CHANGED",
