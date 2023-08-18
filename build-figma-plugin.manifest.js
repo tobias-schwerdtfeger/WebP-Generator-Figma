@@ -7,6 +7,9 @@ module.exports = function (manifest) {
             allowedDomains: [
                 "none"
             ]
-        }
+        },
+        capabilities: [
+            "inspect"
+        ]
     }
 }

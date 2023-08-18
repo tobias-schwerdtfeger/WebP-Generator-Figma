@@ -15,6 +15,19 @@
     flex-direction: column;
 }
 
+.naming {
+    display: flex;
+    gap: 8px;
+}
+
+.naming > div:nth-child(1) {
+    flex-basis: 70%
+}
+
+.naming > div:nth-child(2) {
+    flex-basis: 30%
+}
+
 #donate {
     display: flex;
     align-items: center;

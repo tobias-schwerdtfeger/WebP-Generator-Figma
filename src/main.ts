@@ -1,5 +1,9 @@
 import { emit, on, showUI } from "@create-figma-plugin/utilities";
-import { RenderedImage, RenderedImageScale } from "./types";
+import {
+  RenderedImage,
+  RenderedImageScale,
+  SettingsNamingConvention,
+} from "./types";
 import {
   RenderRequestHandler,
   RenderResultHandler,
@@ -7,12 +11,12 @@ import {
   SelectionChanged,
 } from "./events";
 
-function exportSize(size: number): ExportSettings {
+function exportSize(type: "SCALE" | "HEIGHT", value: number): ExportSettings {
   return {
     format: "PNG",
     constraint: {
-      type: "SCALE",
-      value: size,
+      type: type,
+      value: value,
     },
   };
 }
@@ -23,16 +27,16 @@ export default function () {
       if (figma.currentPage.selection.length > 0) {
         const node = figma.currentPage.selection[0];
 
-        Promise.all(scales.map((s) => node.exportAsync(exportSize(s)))).then(
-          (pngs) => {
-            emit<RenderResultHandler>(
-              "RENDER_RESULT",
-              scales.map((scale, index) => {
-                return { scale: scale, image: pngs[index] } as RenderedImage;
-              })
-            );
-          }
-        );
+        Promise.all(
+          scales.map((s) => node.exportAsync(exportSize("SCALE", s))),
+        ).then((pngs) => {
+          emit<RenderResultHandler>(
+            "RENDER_RESULT",
+            scales.map((scale, index) => {
+              return { scale: scale, image: pngs[index] } as RenderedImage;
+            }),
+          );
+        });
       } else {
         emit<SelectionChanged>("SELECTION_CHANGED", undefined, undefined);
       }
@@ -46,13 +50,11 @@ export default function () {
   figma.on("selectionchange", async () => {
     if (figma.currentPage.selection.length > 0) {
       const node = figma.currentPage.selection[0];
-      const regexName = /[^a-zA-Z0-9]+/g;
-      const newName = node.name.replace(regexName, "_").toLowerCase();
 
       emit<SelectionChanged>(
         "SELECTION_CHANGED",
-        newName,
-        await node.exportAsync(exportSize(1))
+        node.name,
+        await node.exportAsync(exportSize("HEIGHT", 150)),
       );
     } else {
       emit<SelectionChanged>("SELECTION_CHANGED", undefined, undefined);
@@ -88,6 +90,13 @@ export default function () {
     if (!("useOptimizedSize" in settings)) {
       settings["useOptimizedSize"] = true;
     }
-    showUI({ width: 320, height: 360 }, settings);
+    // V3
+    if (!("namingConvention" in settings)) {
+      settings["namingConvention"] = {
+        transform: "lowercase",
+        replacement: "_",
+      } as SettingsNamingConvention;
+    }
+    showUI({ width: 320, height: 380 }, settings);
   });
 }

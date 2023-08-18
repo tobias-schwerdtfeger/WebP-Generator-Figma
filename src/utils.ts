@@ -2,7 +2,7 @@ import { RenderedImageScale } from "./types";
 
 export function fileNameAndroid(
   scale: RenderedImageScale,
-  name: string
+  name: string,
 ): string {
   let suffix;
   switch (scale) {
@@ -25,7 +25,11 @@ export function fileNameAndroid(
   return `drawable-${suffix}/${name}`;
 }
 
-export function fileNameWeb(scale: RenderedImageScale, name: string): string {
+export function fileNameWeb(
+  scale: RenderedImageScale,
+  name: string,
+  replacement: string,
+): string {
   let suffix;
   switch (scale) {
     case 1:
@@ -44,5 +48,5 @@ export function fileNameWeb(scale: RenderedImageScale, name: string): string {
       suffix = "4x";
       break;
   }
-  return `${name}/${name}_${suffix}`;
+  return `${name}/${name}${replacement}${suffix}`;
 }

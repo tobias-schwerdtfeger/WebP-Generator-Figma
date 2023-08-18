@@ -13,11 +13,19 @@ import {
   Divider,
   Disclosure,
   Toggle,
+  DropdownOption,
+  Dropdown,
+  Bold,
 } from "@create-figma-plugin/ui";
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { emit, on } from "@create-figma-plugin/utilities";
-import { RenderedImage, RenderedImageScale, Settings } from "./types";
+import {
+  RenderedImage,
+  RenderedImageScale,
+  Settings,
+  SettingsNamingConvention,
+} from "./types";
 import JSZip from "jszip";
 import styles from "./styles.css";
 import donateLogo from "./ko-fi-logo.png";
@@ -32,13 +40,14 @@ import { fileNameAndroid, fileNameWeb } from "./utils";
 function createZip(
   b64WebP: { data: string; scale: RenderedImageScale }[],
   baseName: string,
-  isAndroidExport: boolean
+  isAndroidExport: boolean,
+  replacement: string,
 ): JSZip {
   const zip = new JSZip();
   b64WebP.forEach(({ data, scale }) => {
     const fileName = isAndroidExport
       ? fileNameAndroid(scale, baseName)
-      : fileNameWeb(scale, baseName);
+      : fileNameWeb(scale, baseName, replacement);
 
     zip.file(`${fileName}.webp`, data, { base64: true });
   });
@@ -61,14 +70,17 @@ function downloadFile(b64Data: string, name: string, type: "webp" | "zip") {
 
 function Preview(settings: Settings) {
   const [useAndroidExport, setUseAndroidExport] = useState(
-    settings.useAndroidExport
+    settings.useAndroidExport,
   );
   const [exportScales, setExportScales] = useState(
-    new Map(settings.selectedExportScales)
+    new Map(settings.selectedExportScales),
   );
   const [useOptimizedSize, setUseOptimizedSize] = useState<boolean>(
-    settings.useOptimizedSize
+    settings.useOptimizedSize,
   );
+  const [namingConvention, setNamingConvention] =
+    useState<SettingsNamingConvention>(settings.namingConvention);
+
   useEffect(() => {
     emit<SaveSettings>("SAVE_SETTINGS", {
       useAndroidExport: useAndroidExport,
@@ -77,18 +89,20 @@ function Preview(settings: Settings) {
         scale,
         checked,
       ]),
+      namingConvention: namingConvention,
     });
-  }, [useAndroidExport, exportScales, useOptimizedSize]);
+  }, [useAndroidExport, exportScales, useOptimizedSize, namingConvention]);
 
+  const [originalFileName, setOriginalFileName] = useState("");
   const [fileName, setFileName] = useState("");
   const [previewImage, setPreviewImage] = useState<Uint8Array | undefined>(
-    undefined
+    undefined,
   );
   const [inProgress, setInProgress] = useState(false);
 
   function exportButtonDisabled() {
     let anyChecked = false;
-    exportScales.forEach((checked, _) => {
+    exportScales.forEach((checked) => {
       if (checked) {
         anyChecked = true;
       }
@@ -101,6 +115,25 @@ function Preview(settings: Settings) {
     );
   }
 
+  function convertName(
+    name: string,
+    convention: SettingsNamingConvention,
+  ): string {
+    let newName = name;
+    if (convention.transform !== "no-transform") {
+      const regexName = /[^a-zA-Z0-9]+/g;
+      newName = newName.replace(regexName, convention.replacement);
+    }
+    if (convention.transform === "lowercase") {
+      newName = newName.toLowerCase();
+    }
+    return newName;
+  }
+
+  useEffect(() => {
+    setFileName(convertName(originalFileName, namingConvention));
+  }, [namingConvention]);
+
   useEffect(() => {
     const deleteSelectionChangedHandler = on<SelectionChanged>(
       "SELECTION_CHANGED",
@@ -110,9 +143,10 @@ function Preview(settings: Settings) {
           setFileName("");
         } else {
           setPreviewImage(image);
-          setFileName(name);
+          setOriginalFileName(name);
+          setFileName(convertName(name, namingConvention));
         }
-      }
+      },
     );
 
     const deleteRenderResultHandler = on<RenderResultHandler>(
@@ -125,7 +159,7 @@ function Preview(settings: Settings) {
           const b64WebP: { data: string; scale: RenderedImageScale }[] = [];
           rimages.forEach((rimg) => {
             const canvas = document.createElement(
-              "canvas"
+              "canvas",
             ) as HTMLCanvasElement;
             const ctx = canvas.getContext("2d");
             const blob = new Blob([rimg.image], { type: "image/png" });
@@ -143,20 +177,28 @@ function Preview(settings: Settings) {
                 scale: rimg.scale,
               });
 
-              // finally generate zip and download
+              // finally, generate zip and download
               if (rimages.length == 1 && b64WebP.length == 1) {
                 downloadFile(b64WebP[0].data, name, "webp");
 
                 setInProgress(false);
               } else if (b64WebP.length == rimages.length) {
-                await downloadZip(createZip(b64WebP, name, android), name);
+                await downloadZip(
+                  createZip(
+                    b64WebP,
+                    name,
+                    android,
+                    namingConvention.replacement,
+                  ),
+                  name,
+                );
 
                 setInProgress(false);
               }
             };
           });
         });
-      }
+      },
     );
 
     return () => {
@@ -167,7 +209,7 @@ function Preview(settings: Settings) {
 
   useEffect(() => {
     const element = document.getElementById(
-      "img-preview"
+      "img-preview",
     ) as HTMLImageElement | null;
     if (element === null) {
       return;
@@ -183,8 +225,8 @@ function Preview(settings: Settings) {
   const clickDownloadZip = useCallback(() => {
     setInProgress(true);
     const exp = Array.from(exportScales.entries())
-      .filter(([_, toggled]) => toggled)
-      .map(([scale, _]) => scale);
+      .filter(([, toggled]) => toggled)
+      .map(([scale]) => scale);
     emit<RenderRequestHandler>("RENDER_REQUEST", exp);
   }, [exportScales]);
 
@@ -202,6 +244,22 @@ function Preview(settings: Settings) {
     );
   }
 
+  const options: Array<DropdownOption<SettingsNamingConvention["transform"]>> =
+    [
+      {
+        text: "Preserve Layer Name",
+        value: "no-transform",
+      },
+      {
+        text: "convert to lower case",
+        value: "lowercase",
+      },
+      {
+        text: "Convert to Case Sensitive",
+        value: "case-sensitive",
+      },
+    ];
+
   const [showPreferences, setShowPreferences] = useState(false);
   return (
     <Container space="medium">
@@ -211,7 +269,12 @@ function Preview(settings: Settings) {
       <Textbox
         placeholder="Enter filename"
         variant="border"
-        onInput={(event) => setFileName(event.currentTarget.value)}
+        onInput={(event) => {
+          const name = event.currentTarget.value;
+          // override with user input
+          setOriginalFileName(name);
+          setFileName(name);
+        }}
         value={fileName}
       />
       <VerticalSpace space="small" />
@@ -226,14 +289,17 @@ function Preview(settings: Settings) {
       </Button>
       <VerticalSpace space="large" />
       <Disclosure
-        onClick={(_) => {
+        onClick={() => {
           setShowPreferences(!showPreferences);
         }}
         open={showPreferences}
         title="Preferences"
       >
-        <Text>Quality</Text>
         <VerticalSpace space="small" />
+        <Text>
+          <Bold>Quality and Resolution</Bold>
+        </Text>
+        <VerticalSpace space="medium" />
         <Toggle
           onValueChange={(value) => setUseOptimizedSize(value)}
           value={useOptimizedSize}
@@ -241,48 +307,88 @@ function Preview(settings: Settings) {
           <Text>Optimized Size</Text>
         </Toggle>
         <VerticalSpace space="small" />
-        <Text>Resolution</Text>
-        <VerticalSpace space="small" />
         <Inline space="small">
           {ScaleExportToggle(
             exportScales.get(1) ?? false,
             1,
             (scale, checked) => {
               setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            }
+            },
           )}
           {ScaleExportToggle(
             exportScales.get(1.5) ?? false,
             1.5,
             (scale, checked) => {
               setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            }
+            },
           )}
           {ScaleExportToggle(
             exportScales.get(2) ?? false,
             2,
             (scale, checked) => {
               setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            }
+            },
           )}
           {ScaleExportToggle(
             exportScales.get(3) ?? false,
             3,
             (scale, checked) => {
               setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            }
+            },
           )}
           {ScaleExportToggle(
             exportScales.get(4) ?? false,
             4,
             (scale, checked) => {
               setExportScales(new Map(exportScales.set(scale, checked)));
-            }
+            },
           )}
         </Inline>
         <VerticalSpace space="small" />
+
         <Divider />
+        <VerticalSpace space="medium" />
+        <Text>
+          <Bold>Naming</Bold>
+        </Text>
+        <VerticalSpace space="medium" />
+        <div className={styles.naming}>
+          <Dropdown
+            onChange={(value) =>
+              setNamingConvention((v) => {
+                return {
+                  transform: value.currentTarget
+                    .value as SettingsNamingConvention["transform"],
+                  replacement: v.replacement,
+                };
+              })
+            }
+            options={options}
+            value={namingConvention.transform}
+            variant="border"
+          />
+          <Textbox
+            onChange={(value) =>
+              setNamingConvention((v) => {
+                return {
+                  transform: v.transform,
+                  replacement: value.currentTarget.value,
+                };
+              })
+            }
+            value={namingConvention.replacement}
+            variant="border"
+            placeholder="Divider"
+          />
+        </div>
         <VerticalSpace space="small" />
+
+        <Divider />
+        <VerticalSpace space="medium" />
+        <Text>
+          <Bold>Folder Structure</Bold>
+        </Text>
+        <VerticalSpace space="medium" />
         <Toggle
           onValueChange={(checked) => setUseAndroidExport(checked)}
           value={useAndroidExport}
@@ -290,7 +396,7 @@ function Preview(settings: Settings) {
           <Text>Export for Android</Text>
         </Toggle>
       </Disclosure>
-      <VerticalSpace space="extraSmall" />
+      <VerticalSpace space="extraLarge" />
       {DonateLogo()}
       <VerticalSpace space="medium" />
     </Container>
@@ -300,7 +406,7 @@ function Preview(settings: Settings) {
 function ScaleExportToggle(
   checked: boolean,
   scale: RenderedImageScale,
-  setScale: (scale: RenderedImageScale, checked: boolean) => void
+  setScale: (scale: RenderedImageScale, checked: boolean) => void,
 ) {
   return (
     <Checkbox

@@ -1,1 +1,1 @@
-{"api":"1.0.0","editorType":["figma","figjam"],"id":"1181873200384736932","name":"WebP Exporter","main":"build/main.js","ui":"build/ui.js","networkAccess":{"allowedDomains":["none"]}}
+{"api":"1.0.0","editorType":["figma","dev"],"id":"1181873200384736932","name":"WebP Exporter","main":"build/main.js","ui":"build/ui.js","capabilities":["inspect"],"networkAccess":{"allowedDomains":["none"]}}

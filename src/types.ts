@@ -6,9 +6,14 @@ export type RenderedImage = {
 };
 
 export type SettingsExportScales = [RenderedImageScale, boolean];
+export type SettingsNamingConvention = {
+  transform: "lowercase" | "case-sensitive" | "no-transform";
+  replacement: string;
+};
 
 export type Settings = {
   useAndroidExport: boolean;
   useOptimizedSize: boolean;
   selectedExportScales: SettingsExportScales[];
+  namingConvention: SettingsNamingConvention;
 };
