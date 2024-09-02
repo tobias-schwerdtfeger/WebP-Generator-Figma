@@ -2,7 +2,11 @@
   "extends": "@create-figma-plugin/tsconfig",
   "compilerOptions": {
     "typeRoots": ["./node_modules/@figma", "./node_modules/@types"],
-    "target": "ES6"
+    "target": "ES2023",
+    "lib": ["ESNext.Array", "esnext"],
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "h.Fragment"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

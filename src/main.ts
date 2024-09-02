@@ -1,9 +1,5 @@
 import { emit, on, showUI } from "@create-figma-plugin/utilities";
-import {
-  RenderedImage,
-  RenderedImageScale,
-  SettingsNamingConvention,
-} from "./types";
+import { RenderedImageScale, SettingsNamingConvention } from "./types";
 import {
   RenderRequestHandler,
   RenderResultHandler,
@@ -14,6 +10,7 @@ import {
 function exportSize(type: "SCALE" | "HEIGHT", value: number): ExportSettings {
   return {
     format: "PNG",
+    useAbsoluteBounds: true,
     constraint: {
       type: type,
       value: value,
@@ -21,24 +18,37 @@ function exportSize(type: "SCALE" | "HEIGHT", value: number): ExportSettings {
   };
 }
 
+let selectedNodeIds = new Map<string, number>();
+
 export default function () {
   on<RenderRequestHandler>("RENDER_REQUEST", (scales: RenderedImageScale[]) => {
     new Promise(() => {
       if (figma.currentPage.selection.length > 0) {
-        const node = figma.currentPage.selection[0];
-
         Promise.all(
-          scales.map((s) => node.exportAsync(exportSize("SCALE", s))),
-        ).then((pngs) => {
-          emit<RenderResultHandler>(
-            "RENDER_RESULT",
-            scales.map((scale, index) => {
-              return { scale: scale, image: pngs[index] } as RenderedImage;
-            }),
-          );
-        });
+          figma.currentPage.selection.map(async (node) => {
+            const images = await Promise.all(
+              scales.map(async (s) => {
+                const img = await node.exportAsync(exportSize("SCALE", s));
+                return {
+                  scale: s,
+                  image: img,
+                };
+              }),
+            );
+            return {
+              name: node.name,
+              images: images,
+            };
+          }),
+        )
+          .then((result) => {
+            emit<RenderResultHandler>("RENDER_RESULT", result);
+          })
+          .catch((reason) => {
+            console.error("Error while rendering images", reason);
+          });
       } else {
-        emit<SelectionChanged>("SELECTION_CHANGED", undefined, undefined);
+        emit<SelectionChanged>("SELECTION_CHANGED", 0, [], []);
       }
     });
   });
@@ -49,15 +59,47 @@ export default function () {
 
   figma.on("selectionchange", async () => {
     if (figma.currentPage.selection.length > 0) {
-      const node = figma.currentPage.selection[0];
+      const now = Date.now();
+      const nodesWithSelectionHistory = figma.currentPage.selection
+        .map((node, index) => {
+          const tm = selectedNodeIds.get(node.id) ?? now + index;
+          return { node, tm };
+        })
+        .sort((a, b) => b.tm - a.tm);
+
+      const previewImages = await Promise.all(
+        nodesWithSelectionHistory.slice(0, 3).map(async ({ node }) => {
+          return await node.exportAsync(exportSize("HEIGHT", 150));
+        }),
+      );
+
+      const totalPixelSize = figma.currentPage.selection.reduce(
+        (previousValue, currentValue) => {
+          const size = previousValue + currentValue.width * currentValue.height;
+          // let's not have silly bugs in the future and eliminate this edge case here
+          return Number.isSafeInteger(size) ? size : Number.MAX_SAFE_INTEGER;
+        },
+        0,
+      );
+
+      const nodes = figma.currentPage.selection.map((node) => {
+        return { id: node.id, name: node.name };
+      });
+
+      selectedNodeIds = new Map(
+        nodesWithSelectionHistory.map(({ node, tm }) => [node.id, tm]),
+      );
 
       emit<SelectionChanged>(
         "SELECTION_CHANGED",
-        node.name,
-        await node.exportAsync(exportSize("HEIGHT", 150)),
+        totalPixelSize,
+        nodes,
+        previewImages,
       );
     } else {
-      emit<SelectionChanged>("SELECTION_CHANGED", undefined, undefined);
+      selectedNodeIds = new Map();
+
+      emit<SelectionChanged>("SELECTION_CHANGED", 0, [], []);
     }
   });
 

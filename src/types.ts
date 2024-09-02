@@ -5,6 +5,8 @@ export type RenderedImage = {
   image: Uint8Array;
 };
 
+export type SelectedNode = { id: string; name: string };
+
 export type SettingsExportScales = [RenderedImageScale, boolean];
 export type SettingsNamingConvention = {
   transform: "lowercase" | "case-sensitive" | "no-transform";

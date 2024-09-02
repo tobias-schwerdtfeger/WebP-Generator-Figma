@@ -1,9 +1,18 @@
 import { EventHandler } from "@create-figma-plugin/utilities";
-import { RenderedImage, RenderedImageScale, Settings } from "./types";
+import {
+  RenderedImage,
+  RenderedImageScale,
+  SelectedNode,
+  Settings,
+} from "./types";
 
 export interface SelectionChanged extends EventHandler {
   name: "SELECTION_CHANGED";
-  handler: (name: string | undefined, image: Uint8Array | undefined) => void;
+  handler: (
+    totalPixelSize: number,
+    nodes: SelectedNode[],
+    previewImages: Uint8Array[],
+  ) => void;
 }
 
 export interface RenderRequestHandler extends EventHandler {
@@ -13,7 +22,7 @@ export interface RenderRequestHandler extends EventHandler {
 
 export interface RenderResultHandler extends EventHandler {
   name: "RENDER_RESULT";
-  handler: (images: RenderedImage[]) => void;
+  handler: (nodes: { name: string; images: RenderedImage[] }[]) => void;
 }
 
 export interface SaveSettings extends EventHandler {

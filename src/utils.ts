@@ -1,4 +1,4 @@
-import { RenderedImageScale } from "./types";
+import { RenderedImageScale, SettingsNamingConvention } from "./types";
 
 export function fileNameAndroid(
   scale: RenderedImageScale,
@@ -49,4 +49,20 @@ export function fileNameWeb(
       break;
   }
   return `${name}/${name}${replacement}${suffix}`;
+}
+
+export function convertFileName(
+  name: string,
+  convention: SettingsNamingConvention,
+): string {
+  let newName = name;
+  if (convention.transform !== "no-transform") {
+    const regexName = /[^a-zA-Z0-9]+/g;
+    newName = newName.replace(regexName, convention.replacement);
+  }
+  if (convention.transform === "lowercase") {
+    newName = newName.toLowerCase();
+  }
+  // let's limit the file name here; otherwise it might happen that the zip is unpackable
+  return newName.slice(0, 200);
 }

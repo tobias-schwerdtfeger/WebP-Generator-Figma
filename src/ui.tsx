@@ -1,4 +1,3 @@
-/** @jsx h */
 import {
   Button,
   Checkbox,
@@ -18,6 +17,9 @@ import {
   Bold,
   RangeSlider,
   TextboxNumeric,
+  Banner,
+  IconWarning32,
+  IconInfo32,
 } from "@create-figma-plugin/ui";
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
@@ -25,6 +27,7 @@ import { emit, on } from "@create-figma-plugin/utilities";
 import {
   RenderedImage,
   RenderedImageScale,
+  SelectedNode,
   Settings,
   SettingsNamingConvention,
 } from "./types";
@@ -37,37 +40,61 @@ import {
   SaveSettings,
   SelectionChanged,
 } from "./events";
-import { fileNameAndroid, fileNameWeb } from "./utils";
+import { convertFileName, fileNameAndroid, fileNameWeb } from "./utils";
 
-function createZip(
-  b64WebP: { data: string; scale: RenderedImageScale }[],
+const MaxPixelSize = 5e7;
+
+function zipFiles(
+  zip: JSZip,
+  webp: { data: Blob; scale: RenderedImageScale }[],
   baseName: string,
   isAndroidExport: boolean,
   replacement: string,
 ): JSZip {
-  const zip = new JSZip();
-  b64WebP.forEach(({ data, scale }) => {
+  webp.forEach(({ data, scale }) => {
     const fileName = isAndroidExport
       ? fileNameAndroid(scale, baseName)
       : fileNameWeb(scale, baseName, replacement);
 
-    zip.file(`${fileName}.webp`, data, { base64: true });
+    zip.file(`${fileName}.webp`, data);
   });
   return zip;
 }
 
 async function downloadZip(zip: JSZip, name: string) {
-  const b64Zip = await zip.generateAsync({ type: "base64" });
-  downloadFile(b64Zip, name, "zip");
+  downloadFile(await zip.generateAsync({ type: "blob" }), name);
 }
 
-function downloadFile(b64Data: string, name: string, type: "webp" | "zip") {
+function downloadFile(data: Blob, name: string) {
   const link = document.createElement("a");
   link.download = name;
-  link.href = `data:${
-    type == "webp" ? "image" : "application"
-  }/${type};base64,${b64Data}`;
+  link.href = URL.createObjectURL(data);
   link.click();
+}
+
+async function compressImage(data: Uint8Array, quality: number): Promise<Blob> {
+  const canvas = document.createElement("canvas") as HTMLCanvasElement;
+  const ctx = canvas.getContext("2d");
+  const blob = new Blob([data], { type: "image/png" });
+  const image = new Image();
+
+  image.src = URL.createObjectURL(blob);
+  return await new Promise<Blob>((resolve, reject) => {
+    image.onload = async () => {
+      canvas.width = image.width;
+      canvas.height = image.height;
+      ctx?.drawImage(image, 0, 0);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject("Couldn't create image");
+        },
+        "image/webp",
+        quality,
+      );
+    };
+  });
 }
 
 function Preview(settings: Settings) {
@@ -95,11 +122,11 @@ function Preview(settings: Settings) {
     });
   }, [useAndroidExport, exportScales, exportQuality, namingConvention]);
 
+  const [showExportWarning, setShowExportWarning] = useState(false);
   const [originalFileName, setOriginalFileName] = useState("");
   const [fileName, setFileName] = useState("");
-  const [previewImage, setPreviewImage] = useState<Uint8Array | undefined>(
-    undefined,
-  );
+  const [selectedNodes, setSelectedNodes] = useState<SelectedNode[]>([]);
+  const [previewImages, setPreviewImages] = useState<Uint8Array[]>([]);
   const [inProgress, setInProgress] = useState(false);
 
   function isExportButtonDisabled(): boolean {
@@ -110,96 +137,88 @@ function Preview(settings: Settings) {
       }
     });
     return (
-      previewImage == undefined ||
+      setSelectedNodes.length == 0 ||
       fileName.length == 0 ||
       inProgress ||
       !anyChecked
     );
   }
 
-  function convertName(
-    name: string,
-    convention: SettingsNamingConvention,
-  ): string {
-    let newName = name;
-    if (convention.transform !== "no-transform") {
-      const regexName = /[^a-zA-Z0-9]+/g;
-      newName = newName.replace(regexName, convention.replacement);
-    }
-    if (convention.transform === "lowercase") {
-      newName = newName.toLowerCase();
-    }
-    return newName;
-  }
-
   useEffect(() => {
-    setFileName(convertName(originalFileName, namingConvention));
+    setFileName(convertFileName(originalFileName, namingConvention));
   }, [namingConvention]);
 
   useEffect(() => {
     const deleteSelectionChangedHandler = on<SelectionChanged>(
       "SELECTION_CHANGED",
-      function (name: string | undefined, image: Uint8Array | undefined) {
-        if (name === undefined || image === undefined) {
-          setPreviewImage(undefined);
+      function (
+        totalPixelSize: number,
+        nodes: SelectedNode[],
+        previewImages: Uint8Array[],
+      ) {
+        setShowExportWarning(totalPixelSize > MaxPixelSize);
+        setSelectedNodes(nodes);
+        if (nodes.length === 0) {
+          setPreviewImages([]);
           setFileName("");
         } else {
-          setPreviewImage(image);
-          setOriginalFileName(name);
-          setFileName(convertName(name, namingConvention));
+          setPreviewImages(previewImages);
+          setOriginalFileName(nodes[0].name);
+          setFileName(convertFileName(nodes[0].name, namingConvention));
         }
       },
     );
 
     const deleteRenderResultHandler = on<RenderResultHandler>(
       "RENDER_RESULT",
-      function (rimages: RenderedImage[]) {
-        new Promise(() => {
-          const name = fileName;
-          const android = useAndroidExport;
+      function (nodes: { name: string; images: RenderedImage[] }[]) {
+        (async () => {
+          const quality = exportQuality / 100.0;
 
-          const b64WebP: { data: string; scale: RenderedImageScale }[] = [];
-          rimages.forEach((rimg) => {
-            const canvas = document.createElement(
-              "canvas",
-            ) as HTMLCanvasElement;
-            const ctx = canvas.getContext("2d");
-            const blob = new Blob([rimg.image], { type: "image/png" });
-            const image = new Image();
+          if (nodes.length == 1 && nodes[0].images.length == 1) {
+            setInProgress(false);
+            // special case
+            const webp = await compressImage(nodes[0].images[0].image, quality);
+            downloadFile(webp, fileName);
+          } else {
+            const zip = new JSZip();
 
-            image.src = URL.createObjectURL(blob);
-            image.onload = async () => {
-              canvas.width = image.width;
-              canvas.height = image.height;
-              ctx?.drawImage(image, 0, 0);
-              b64WebP.push({
-                data: canvas
-                  .toDataURL("image/webp", exportQuality / 100.0)
-                  .split(",")[1],
-                scale: rimg.scale,
-              });
+            for (const node of nodes) {
+              const webps = await Promise.all(
+                node.images.map(async (img) => {
+                  const webp = await compressImage(img.image, quality);
+                  return {
+                    data: webp,
+                    scale: img.scale,
+                  };
+                }),
+              );
 
-              // finally, generate zip and download
-              if (rimages.length == 1 && b64WebP.length == 1) {
-                downloadFile(b64WebP[0].data, name, "webp");
+              // mimic the existing behavior - with only one node, the input is considered
+              const name =
+                nodes.length == 1
+                  ? fileName
+                  : convertFileName(node.name, namingConvention);
 
-                setInProgress(false);
-              } else if (b64WebP.length == rimages.length) {
-                await downloadZip(
-                  createZip(
-                    b64WebP,
-                    name,
-                    android,
-                    namingConvention.replacement,
-                  ),
-                  name,
-                );
+              zipFiles(
+                zip,
+                webps,
+                name,
+                useAndroidExport,
+                namingConvention.replacement,
+              );
+            }
 
-                setInProgress(false);
-              }
-            };
-          });
-        });
+            setInProgress(false);
+
+            await downloadZip(
+              zip,
+              nodes.length == 1
+                ? fileName
+                : `export_${new Date().toISOString().replace(".", "-")}`,
+            );
+          }
+        })();
       },
     );
 
@@ -208,21 +227,6 @@ function Preview(settings: Settings) {
       deleteRenderResultHandler();
     };
   });
-
-  useEffect(() => {
-    const element = document.getElementById(
-      "img-preview",
-    ) as HTMLImageElement | null;
-    if (element === null) {
-      return;
-    }
-    if (previewImage === undefined) {
-      element.src = "";
-    } else {
-      const blob = new Blob([previewImage], { type: "image/png" });
-      element.src = URL.createObjectURL(blob);
-    }
-  }, [previewImage]);
 
   const clickDownloadZip = useCallback(() => {
     setInProgress(true);
@@ -233,9 +237,22 @@ function Preview(settings: Settings) {
   }, [exportScales]);
 
   let preview;
-  if (previewImage !== undefined) {
+  if (previewImages.length > 0) {
     preview = (
-      <img id={"img-preview"} alt={""} src={undefined} class={styles.preview} />
+      <div className={styles.preview_stack}>
+        {previewImages.toReversed().map((image, index) => {
+          const blob = new Blob([image], { type: "image/png" });
+          return (
+            <img
+              key={index}
+              id={"img-preview"}
+              alt={""}
+              src={URL.createObjectURL(blob)}
+              className={styles.preview}
+            />
+          );
+        })}
+      </div>
     );
   } else {
     preview = (
@@ -271,18 +288,38 @@ function Preview(settings: Settings) {
       <VerticalSpace space="medium" />
       <MiddleAlign style={"height: auto;"}>{preview}</MiddleAlign>
       <VerticalSpace space="large" />
-      <Textbox
-        placeholder="Enter filename"
-        variant="border"
-        onInput={(event) => {
-          const name = event.currentTarget.value;
-          // override with user input
-          setOriginalFileName(name);
-          setFileName(name);
-        }}
-        value={fileName}
-      />
-      <VerticalSpace space="small" />
+      {selectedNodes.length > 1 && !showExportWarning ? (
+        <>
+          <Banner icon={<IconInfo32 />}>
+            Too many or large nodes may freeze the UI during export.
+          </Banner>
+          <VerticalSpace space="small" />
+        </>
+      ) : null}
+      {showExportWarning ? (
+        <>
+          <Banner icon={<IconWarning32 />} variant="warning">
+            Exporting may freeze the UI. Try selecting fewer or smaller nodes.
+          </Banner>
+          <VerticalSpace space="small" />
+        </>
+      ) : null}
+      {selectedNodes.length <= 1 ? (
+        <>
+          <Textbox
+            placeholder="Enter filename"
+            variant="border"
+            onInput={(event) => {
+              const name = event.currentTarget.value;
+              // override with user input
+              setOriginalFileName(name);
+              setFileName(name);
+            }}
+            value={fileName}
+          />
+          <VerticalSpace space="small" />
+        </>
+      ) : null}
       <Button
         fullWidth
         secondary
@@ -290,7 +327,9 @@ function Preview(settings: Settings) {
         disabled={isExportButtonDisabled()}
         onClick={() => clickDownloadZip()}
       >
-        Export
+        {selectedNodes.length <= 1
+          ? "Export"
+          : `Export ${selectedNodes.length} images`}
       </Button>
       <VerticalSpace space="large" />
       <Disclosure

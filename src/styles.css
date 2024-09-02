@@ -1,7 +1,38 @@
-.preview {
+.preview_stack {
   height: 150px;
   max-width: 256px;
+  position: relative;
+}
+
+.preview:nth-child(1) {
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+
+.preview:nth-child(2) {
+  transform: translate(-50%, -50%) rotate(-16deg);
+  z-index: 1;
+}
+
+.preview:nth-child(3) {
+  transform: translate(-50%, -50%) rotate(12deg);
+  z-index: 2;
+}
+
+.preview {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 150px;
+  width: 150px;
+  max-width: 256px;
   object-fit: contain;
+  background: rgba(245, 245, 245, 0.6);
+  border-radius: 16px;
+  backdrop-filter: blur(2px);
+  border-width: 1px;
+  border-color: lightgrey;
 }
 
 .preview_no_selection {
