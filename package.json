@@ -3,34 +3,39 @@
     "build": "build-figma-plugin --typecheck --minify",
     "watch": "build-figma-plugin --typecheck --watch",
     "lint": "eslint . --ext .ts,.tsx",
-    "lintFormat": "eslint . --ext .ts,.tsx --fix",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "fmt": "prettier . -c",
+    "fmt:fix": "prettier . -w",
     "postinstall": "patch-package"
   },
   "dependencies": {
-    "@create-figma-plugin/ui": "^2.6.0",
-    "@create-figma-plugin/utilities": "^2.6.0",
-    "preact": "^10.17.0"
+    "@create-figma-plugin/ui": "3.2.0",
+    "@create-figma-plugin/utilities": "3.2.0",
+    "react": "18.2.0"
   },
   "devDependencies": {
-    "@create-figma-plugin/build": "^2.6.0",
-    "@create-figma-plugin/tsconfig": "^2.6.0",
-    "@figma/plugin-typings": "^1.74.0",
-    "@types/node": "^20.5.0",
-    "@typescript-eslint/eslint-plugin": "^6.4.0",
-    "@typescript-eslint/parser": "^6.4.0",
-    "eslint": "^8.47.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "eslint-plugin-react": "^7.33.2",
+    "@create-figma-plugin/build": "3.2.0",
+    "@create-figma-plugin/tsconfig": "3.2.0",
+    "@figma/eslint-plugin-figma-plugins": "^0.15.0",
+    "@figma/plugin-typings": "1.99.0",
+    "@types/node": "22.5.2",
+    "@typescript-eslint/eslint-plugin": "^8.3.0",
+    "@typescript-eslint/parser": "8.3.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-plugin-jest": "^28.8.2",
+    "eslint-plugin-react": "^7.35.0",
     "jszip": "^3.10.1",
     "patch-package": "^8.0.0",
-    "typescript": "^5.1.6"
+    "prettier": "3.2.5",
+    "typescript": "5.5.4"
   },
   "figma-plugin": {
     "editorType": [
       "figma",
       "dev"
     ],
+    "documentAccess": "dynamic-page",
     "containsWidget": false,
     "id": "1181873200384736932",
     "name": "WebP Exporter",

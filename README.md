@@ -4,9 +4,10 @@
 
 ![Cover](figma/Cover_Art.png)
 
-***Export WebP files from Figma for Web or Android***
+**_Export WebP files from Figma for Web or Android_**
 
 ### Features
+
 - Export any image as WebP
 - Supported resolutions are xxxhdpi, xxhdpi, xhdpi, hdpi, mdpi
 - Convenient folder structure to match your Android project
@@ -37,4 +38,4 @@ image \
     image_4x.webp
 ```
 
-Check out the plugin at [Figma](https://www.figma.com/community/plugin/1181873200384736932). 
+Check out the plugin at [Figma](https://www.figma.com/community/plugin/1181873200384736932).

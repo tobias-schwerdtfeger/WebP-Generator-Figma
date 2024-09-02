@@ -13,7 +13,7 @@ export type SettingsNamingConvention = {
 
 export type Settings = {
   useAndroidExport: boolean;
-  useOptimizedSize: boolean;
+  exportQuality: number;
   selectedExportScales: SettingsExportScales[];
   namingConvention: SettingsNamingConvention;
 };

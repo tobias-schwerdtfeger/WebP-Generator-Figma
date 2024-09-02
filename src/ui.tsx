@@ -16,6 +16,8 @@ import {
   DropdownOption,
   Dropdown,
   Bold,
+  RangeSlider,
+  TextboxNumeric,
 } from "@create-figma-plugin/ui";
 import { h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
@@ -75,8 +77,8 @@ function Preview(settings: Settings) {
   const [exportScales, setExportScales] = useState(
     new Map(settings.selectedExportScales),
   );
-  const [useOptimizedSize, setUseOptimizedSize] = useState<boolean>(
-    settings.useOptimizedSize,
+  const [exportQuality, setExportQuality] = useState<number>(
+    settings.exportQuality,
   );
   const [namingConvention, setNamingConvention] =
     useState<SettingsNamingConvention>(settings.namingConvention);
@@ -84,14 +86,14 @@ function Preview(settings: Settings) {
   useEffect(() => {
     emit<SaveSettings>("SAVE_SETTINGS", {
       useAndroidExport: useAndroidExport,
-      useOptimizedSize: useOptimizedSize,
+      exportQuality: exportQuality,
       selectedExportScales: Array.from(exportScales, ([scale, checked]) => [
         scale,
         checked,
       ]),
       namingConvention: namingConvention,
     });
-  }, [useAndroidExport, exportScales, useOptimizedSize, namingConvention]);
+  }, [useAndroidExport, exportScales, exportQuality, namingConvention]);
 
   const [originalFileName, setOriginalFileName] = useState("");
   const [fileName, setFileName] = useState("");
@@ -100,7 +102,7 @@ function Preview(settings: Settings) {
   );
   const [inProgress, setInProgress] = useState(false);
 
-  function exportButtonDisabled() {
+  function isExportButtonDisabled(): boolean {
     let anyChecked = false;
     exportScales.forEach((checked) => {
       if (checked) {
@@ -172,7 +174,7 @@ function Preview(settings: Settings) {
               ctx?.drawImage(image, 0, 0);
               b64WebP.push({
                 data: canvas
-                  .toDataURL("image/webp", useOptimizedSize ? 0.9 : 1.0)
+                  .toDataURL("image/webp", exportQuality / 100.0)
                   .split(",")[1],
                 scale: rimg.scale,
               });
@@ -244,21 +246,24 @@ function Preview(settings: Settings) {
     );
   }
 
-  const options: Array<DropdownOption<SettingsNamingConvention["transform"]>> =
-    [
-      {
-        text: "Preserve Layer Name",
-        value: "no-transform",
-      },
-      {
-        text: "convert to lower case",
-        value: "lowercase",
-      },
-      {
-        text: "Convert to Case Sensitive",
-        value: "case-sensitive",
-      },
-    ];
+  const options: Array<DropdownOption> = [
+    {
+      text: "Preserve Layer Name",
+      value: "no-transform",
+    },
+    {
+      text: "convert to lower case",
+      value: "lowercase",
+    },
+    {
+      text: "Convert to Case Sensitive",
+      value: "case-sensitive",
+    },
+  ];
+
+  function setExportScale(scale: RenderedImageScale, checked: boolean) {
+    setExportScales((prev) => new Map([...prev, [scale, checked]]));
+  }
 
   const [showPreferences, setShowPreferences] = useState(false);
   return (
@@ -282,7 +287,7 @@ function Preview(settings: Settings) {
         fullWidth
         secondary
         loading={inProgress}
-        disabled={exportButtonDisabled()}
+        disabled={isExportButtonDisabled()}
         onClick={() => clickDownloadZip()}
       >
         Export
@@ -300,49 +305,55 @@ function Preview(settings: Settings) {
           <Bold>Quality and Resolution</Bold>
         </Text>
         <VerticalSpace space="medium" />
-        <Toggle
-          onValueChange={(value) => setUseOptimizedSize(value)}
-          value={useOptimizedSize}
-        >
-          <Text>Optimized Size</Text>
-        </Toggle>
+        <div className={styles.quality}>
+          <RangeSlider
+            minimum={10}
+            maximum={100}
+            increment={10}
+            onNumericValueInput={(value) =>
+              value ? setExportQuality(value) : null
+            }
+            value={exportQuality.toString()}
+          />
+          <TextboxNumeric
+            integer
+            variant="border"
+            minimum={10}
+            maximum={100}
+            onNumericValueInput={(value) =>
+              value ? setExportQuality(value) : null
+            }
+            suffix="%"
+            value={`${exportQuality}%`}
+          />
+        </div>
         <VerticalSpace space="small" />
         <Inline space="small">
-          {ScaleExportToggle(
-            exportScales.get(1) ?? false,
-            1,
-            (scale, checked) => {
-              setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            },
-          )}
-          {ScaleExportToggle(
-            exportScales.get(1.5) ?? false,
-            1.5,
-            (scale, checked) => {
-              setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            },
-          )}
-          {ScaleExportToggle(
-            exportScales.get(2) ?? false,
-            2,
-            (scale, checked) => {
-              setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            },
-          )}
-          {ScaleExportToggle(
-            exportScales.get(3) ?? false,
-            3,
-            (scale, checked) => {
-              setExportScales((prev) => new Map([...prev, [scale, checked]]));
-            },
-          )}
-          {ScaleExportToggle(
-            exportScales.get(4) ?? false,
-            4,
-            (scale, checked) => {
-              setExportScales(new Map(exportScales.set(scale, checked)));
-            },
-          )}
+          <ScaleExportToggle
+            checked={exportScales.get(1) ?? false}
+            scale={1}
+            setScale={setExportScale}
+          />
+          <ScaleExportToggle
+            checked={exportScales.get(1.5) ?? false}
+            scale={1.5}
+            setScale={setExportScale}
+          />
+          <ScaleExportToggle
+            checked={exportScales.get(2) ?? false}
+            scale={2}
+            setScale={setExportScale}
+          />
+          <ScaleExportToggle
+            checked={exportScales.get(3) ?? false}
+            scale={3}
+            setScale={setExportScale}
+          />
+          <ScaleExportToggle
+            checked={exportScales.get(4) ?? false}
+            scale={4}
+            setScale={setExportScale}
+          />
         </Inline>
         <VerticalSpace space="small" />
 
@@ -403,11 +414,17 @@ function Preview(settings: Settings) {
   );
 }
 
-function ScaleExportToggle(
-  checked: boolean,
-  scale: RenderedImageScale,
-  setScale: (scale: RenderedImageScale, checked: boolean) => void,
-) {
+type ScaleExportToggleProps = {
+  checked: boolean;
+  scale: RenderedImageScale;
+  setScale: (scale: RenderedImageScale, checked: boolean) => void;
+};
+
+function ScaleExportToggle({
+  checked,
+  scale,
+  setScale,
+}: ScaleExportToggleProps) {
   return (
     <Checkbox
       onChange={(event) => setScale(scale, event.currentTarget.checked)}

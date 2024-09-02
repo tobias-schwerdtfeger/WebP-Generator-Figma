@@ -97,6 +97,10 @@ export default function () {
         replacement: "_",
       } as SettingsNamingConvention;
     }
+    // V4
+    if (!("exportQuality" in settings)) {
+      settings["exportQuality"] = settings["useOptimizedSize"] ? 90 : 100;
+    }
     showUI({ width: 320, height: 380 }, settings);
   });
 }
