@@ -10,7 +10,6 @@ import {
   VerticalSpace,
   Inline,
   Divider,
-  Disclosure,
   Toggle,
   DropdownOption,
   Dropdown,
@@ -42,7 +41,7 @@ import {
 } from "./events";
 import { convertFileName, fileNameAndroid, fileNameWeb } from "./utils";
 
-const MaxPixelSize = 5e7;
+const MaxPixelSize = 12e6;
 
 function zipFiles(
   zip: JSZip,
@@ -258,7 +257,7 @@ function Preview(settings: Settings) {
     preview = (
       <div class={styles.preview_no_selection}>
         <IconFrame32 />
-        <div>Select frame</div>
+        <div>Select node(s)</div>
       </div>
     );
   }
@@ -282,13 +281,12 @@ function Preview(settings: Settings) {
     setExportScales((prev) => new Map([...prev, [scale, checked]]));
   }
 
-  const [showPreferences, setShowPreferences] = useState(false);
   return (
     <Container space="medium">
       <VerticalSpace space="medium" />
       <MiddleAlign style={"height: auto;"}>{preview}</MiddleAlign>
       <VerticalSpace space="large" />
-      {selectedNodes.length > 1 && !showExportWarning ? (
+      {selectedNodes.length > 4 && !showExportWarning ? (
         <>
           <Banner icon={<IconInfo32 />}>
             Too many or large nodes may freeze the UI during export.
@@ -332,120 +330,112 @@ function Preview(settings: Settings) {
           : `Export ${selectedNodes.length} images`}
       </Button>
       <VerticalSpace space="large" />
-      <Disclosure
-        onClick={() => {
-          setShowPreferences(!showPreferences);
-        }}
-        open={showPreferences}
-        title="Preferences"
+      <VerticalSpace space="small" />
+      <Text>
+        <Bold>Quality and Resolution</Bold>
+      </Text>
+      <VerticalSpace space="medium" />
+      <div className={styles.quality}>
+        <RangeSlider
+          minimum={10}
+          maximum={100}
+          increment={10}
+          onNumericValueInput={(value) =>
+            value ? setExportQuality(value) : null
+          }
+          value={exportQuality.toString()}
+        />
+        <TextboxNumeric
+          integer
+          variant="border"
+          minimum={10}
+          maximum={100}
+          onNumericValueInput={(value) =>
+            value ? setExportQuality(value) : null
+          }
+          suffix="%"
+          value={`${exportQuality}%`}
+        />
+      </div>
+      <VerticalSpace space="small" />
+      <Inline space="small">
+        <ScaleExportToggle
+          checked={exportScales.get(1) ?? false}
+          scale={1}
+          setScale={setExportScale}
+        />
+        <ScaleExportToggle
+          checked={exportScales.get(1.5) ?? false}
+          scale={1.5}
+          setScale={setExportScale}
+        />
+        <ScaleExportToggle
+          checked={exportScales.get(2) ?? false}
+          scale={2}
+          setScale={setExportScale}
+        />
+        <ScaleExportToggle
+          checked={exportScales.get(3) ?? false}
+          scale={3}
+          setScale={setExportScale}
+        />
+        <ScaleExportToggle
+          checked={exportScales.get(4) ?? false}
+          scale={4}
+          setScale={setExportScale}
+        />
+      </Inline>
+      <VerticalSpace space="small" />
+
+      <Divider />
+      <VerticalSpace space="medium" />
+      <Text>
+        <Bold>Naming</Bold>
+      </Text>
+      <VerticalSpace space="medium" />
+      <div className={styles.naming}>
+        <Dropdown
+          onChange={(value) =>
+            setNamingConvention((v) => {
+              return {
+                transform: value.currentTarget
+                  .value as SettingsNamingConvention["transform"],
+                replacement: v.replacement,
+              };
+            })
+          }
+          options={options}
+          value={namingConvention.transform}
+          variant="border"
+        />
+        <Textbox
+          onChange={(value) =>
+            setNamingConvention((v) => {
+              return {
+                transform: v.transform,
+                replacement: value.currentTarget.value,
+              };
+            })
+          }
+          value={namingConvention.replacement}
+          variant="border"
+          placeholder="Divider"
+        />
+      </div>
+      <VerticalSpace space="small" />
+
+      <Divider />
+      <VerticalSpace space="medium" />
+      <Text>
+        <Bold>Folder Structure</Bold>
+      </Text>
+      <VerticalSpace space="medium" />
+      <Toggle
+        onValueChange={(checked) => setUseAndroidExport(checked)}
+        value={useAndroidExport}
       >
-        <VerticalSpace space="small" />
-        <Text>
-          <Bold>Quality and Resolution</Bold>
-        </Text>
-        <VerticalSpace space="medium" />
-        <div className={styles.quality}>
-          <RangeSlider
-            minimum={10}
-            maximum={100}
-            increment={10}
-            onNumericValueInput={(value) =>
-              value ? setExportQuality(value) : null
-            }
-            value={exportQuality.toString()}
-          />
-          <TextboxNumeric
-            integer
-            variant="border"
-            minimum={10}
-            maximum={100}
-            onNumericValueInput={(value) =>
-              value ? setExportQuality(value) : null
-            }
-            suffix="%"
-            value={`${exportQuality}%`}
-          />
-        </div>
-        <VerticalSpace space="small" />
-        <Inline space="small">
-          <ScaleExportToggle
-            checked={exportScales.get(1) ?? false}
-            scale={1}
-            setScale={setExportScale}
-          />
-          <ScaleExportToggle
-            checked={exportScales.get(1.5) ?? false}
-            scale={1.5}
-            setScale={setExportScale}
-          />
-          <ScaleExportToggle
-            checked={exportScales.get(2) ?? false}
-            scale={2}
-            setScale={setExportScale}
-          />
-          <ScaleExportToggle
-            checked={exportScales.get(3) ?? false}
-            scale={3}
-            setScale={setExportScale}
-          />
-          <ScaleExportToggle
-            checked={exportScales.get(4) ?? false}
-            scale={4}
-            setScale={setExportScale}
-          />
-        </Inline>
-        <VerticalSpace space="small" />
-
-        <Divider />
-        <VerticalSpace space="medium" />
-        <Text>
-          <Bold>Naming</Bold>
-        </Text>
-        <VerticalSpace space="medium" />
-        <div className={styles.naming}>
-          <Dropdown
-            onChange={(value) =>
-              setNamingConvention((v) => {
-                return {
-                  transform: value.currentTarget
-                    .value as SettingsNamingConvention["transform"],
-                  replacement: v.replacement,
-                };
-              })
-            }
-            options={options}
-            value={namingConvention.transform}
-            variant="border"
-          />
-          <Textbox
-            onChange={(value) =>
-              setNamingConvention((v) => {
-                return {
-                  transform: v.transform,
-                  replacement: value.currentTarget.value,
-                };
-              })
-            }
-            value={namingConvention.replacement}
-            variant="border"
-            placeholder="Divider"
-          />
-        </div>
-        <VerticalSpace space="small" />
-
-        <Divider />
-        <VerticalSpace space="medium" />
-        <Text>
-          <Bold>Folder Structure</Bold>
-        </Text>
-        <VerticalSpace space="medium" />
-        <Toggle
-          onValueChange={(checked) => setUseAndroidExport(checked)}
-          value={useAndroidExport}
-        >
-          <Text>Export for Android</Text>
-        </Toggle>
-      </Disclosure>
+        <Text>Export for Android</Text>
+      </Toggle>
       <VerticalSpace space="extraLarge" />
       {DonateLogo()}
       <VerticalSpace space="medium" />

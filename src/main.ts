@@ -22,35 +22,33 @@ let selectedNodeIds = new Map<string, number>();
 
 export default function () {
   on<RenderRequestHandler>("RENDER_REQUEST", (scales: RenderedImageScale[]) => {
-    new Promise(() => {
-      if (figma.currentPage.selection.length > 0) {
-        Promise.all(
-          figma.currentPage.selection.map(async (node) => {
-            const images = await Promise.all(
-              scales.map(async (s) => {
-                const img = await node.exportAsync(exportSize("SCALE", s));
-                return {
-                  scale: s,
-                  image: img,
-                };
-              }),
-            );
-            return {
-              name: node.name,
-              images: images,
-            };
-          }),
-        )
-          .then((result) => {
-            emit<RenderResultHandler>("RENDER_RESULT", result);
-          })
-          .catch((reason) => {
-            console.error("Error while rendering images", reason);
-          });
-      } else {
-        emit<SelectionChanged>("SELECTION_CHANGED", 0, [], []);
-      }
-    });
+    if (figma.currentPage.selection.length > 0) {
+      Promise.all(
+        figma.currentPage.selection.map(async (node) => {
+          const images = await Promise.all(
+            scales.map(async (s) => {
+              const img = await node.exportAsync(exportSize("SCALE", s));
+              return {
+                scale: s,
+                image: img,
+              };
+            }),
+          );
+          return {
+            name: node.name,
+            images: images,
+          };
+        }),
+      )
+        .then((result) => {
+          emit<RenderResultHandler>("RENDER_RESULT", result);
+        })
+        .catch((reason) => {
+          console.error("Error while rendering images", reason);
+        });
+    } else {
+      emit<SelectionChanged>("SELECTION_CHANGED", 0, [], []);
+    }
   });
 
   on<SaveSettings>("SAVE_SETTINGS", async (settings) => {
@@ -143,6 +141,6 @@ export default function () {
     if (!("exportQuality" in settings)) {
       settings["exportQuality"] = settings["useOptimizedSize"] ? 90 : 100;
     }
-    showUI({ width: 320, height: 380 }, settings);
+    showUI({ width: 320, height: 580 }, settings);
   });
 }
