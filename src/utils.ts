@@ -1,9 +1,6 @@
 import { RenderedImageScale, SettingsNamingConvention } from "./types";
 
-export function fileNameAndroid(
-  scale: RenderedImageScale,
-  name: string,
-): string {
+export function fileNameAndroid(scale: RenderedImageScale, name: string): string | undefined {
   let suffix;
   switch (scale) {
     case 1:
@@ -21,15 +18,13 @@ export function fileNameAndroid(
     case 4:
       suffix = "xxxhdpi";
       break;
+    default:
+      return undefined;
   }
   return `drawable-${suffix}/${name}`;
 }
 
-export function fileNameWeb(
-  scale: RenderedImageScale,
-  name: string,
-  replacement: string,
-): string {
+export function fileNameWeb(scale: RenderedImageScale, name: string, replacement: string): string {
   let suffix;
   switch (scale) {
     case 1:
@@ -51,10 +46,30 @@ export function fileNameWeb(
   return `${name}/${name}${replacement}${suffix}`;
 }
 
-export function convertFileName(
-  name: string,
-  convention: SettingsNamingConvention,
-): string {
+export function fileNameFlat(scale: RenderedImageScale, name: string, replacement: string): string {
+  const scaleStr = scale.toString().replace(".", "_");
+  return `${name}${replacement}${scaleStr}x`;
+}
+
+export function fileNameIos(scale: RenderedImageScale, name: string): string | undefined {
+  let suffix;
+  switch (scale) {
+    case 1:
+      suffix = "";
+      break;
+    case 2:
+      suffix = "@2x";
+      break;
+    case 3:
+      suffix = "@3x";
+      break;
+    default:
+      return undefined;
+  }
+  return `${name}/${name}${suffix}`;
+}
+
+export function convertFileName(name: string, convention: SettingsNamingConvention): string {
   let newName = name;
   if (convention.transform !== "no-transform") {
     const regexName = /[^a-zA-Z0-9]+/g;

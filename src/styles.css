@@ -1,3 +1,9 @@
+.main {
+  overflow-y: scroll;
+  overflow-x: hidden;
+  height: 100%;
+}
+
 .preview_stack {
   height: 150px;
   max-width: 256px;
@@ -46,6 +52,33 @@
   flex-direction: column;
 }
 
+.column {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.scale_export_item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.scale_export_item_icon {
+  flex-grow: 1;
+}
+
+.scale_export_item_icon[data-unchecked="true"] {
+  color: var(--figma-color-icon-disabled);
+}
+
 .naming {
   display: flex;
   gap: 8px;
@@ -57,6 +90,10 @@
 
 .naming > div:nth-child(2) {
   flex-basis: 30%;
+}
+
+.structure label {
+  width: 100%;
 }
 
 .quality {
@@ -71,6 +108,16 @@
 
 .quality > div:nth-child(2) {
   flex-basis: 30%;
+}
+
+.resize_handle {
+  display: block;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: se-resize;
 }
 
 #donate {

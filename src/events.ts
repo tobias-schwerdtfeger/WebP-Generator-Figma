@@ -1,18 +1,14 @@
 import { EventHandler } from "@create-figma-plugin/utilities";
-import {
-  RenderedImage,
-  RenderedImageScale,
-  SelectedNode,
-  Settings,
-} from "./types";
+import { RenderedImage, RenderedImageScale, SelectedNode, Settings, WindowSize } from "./types";
+
+export interface Resize extends EventHandler {
+  name: "RESIZE";
+  handler: (size: WindowSize) => void;
+}
 
 export interface SelectionChanged extends EventHandler {
   name: "SELECTION_CHANGED";
-  handler: (
-    totalPixelSize: number,
-    nodes: SelectedNode[],
-    previewImages: Uint8Array[],
-  ) => void;
+  handler: (totalPixelSize: number, nodes: SelectedNode[], previewImages: Uint8Array[]) => void;
 }
 
 export interface RenderRequestHandler extends EventHandler {

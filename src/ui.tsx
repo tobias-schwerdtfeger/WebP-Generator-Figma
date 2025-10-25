@@ -1,26 +1,27 @@
 import {
-  Button,
-  Checkbox,
-  Container,
-  IconFrame32,
-  MiddleAlign,
-  Text,
-  render,
-  Textbox,
-  VerticalSpace,
-  Inline,
-  Divider,
-  Toggle,
-  DropdownOption,
-  Dropdown,
-  Bold,
-  RangeSlider,
-  TextboxNumeric,
   Banner,
-  IconWarning32,
-  IconInfo32,
+  Bold,
+  Button,
+  Container,
+  Divider,
+  Dropdown,
+  DropdownOption,
+  IconButton,
+  IconFrame24,
+  IconInfoSmall24,
+  IconPlus24,
+  IconWarningSmall24,
+  MiddleAlign,
+  RangeSlider,
+  render,
+  SegmentedControl,
+  SegmentedControlOption,
+  Text,
+  Textbox,
+  TextboxNumeric,
+  VerticalSpace,
 } from "@create-figma-plugin/ui";
-import { h } from "preact";
+import { ComponentChildren, h } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { emit, on } from "@create-figma-plugin/utilities";
 import {
@@ -29,34 +30,58 @@ import {
   SelectedNode,
   Settings,
   SettingsNamingConvention,
+  WindowSize,
 } from "./types";
 import JSZip from "jszip";
 import styles from "./styles.css";
 import donateLogo from "./ko-fi-logo.png";
-import {
-  RenderRequestHandler,
-  RenderResultHandler,
-  SaveSettings,
-  SelectionChanged,
-} from "./events";
-import { convertFileName, fileNameAndroid, fileNameWeb } from "./utils";
+import { RenderRequestHandler, RenderResultHandler, Resize, SaveSettings, SelectionChanged } from "./events";
+import { convertFileName, fileNameAndroid, fileNameFlat, fileNameIos, fileNameWeb } from "./utils";
+import { EventHandler } from "@create-figma-plugin/ui/lib/types/event-handler";
+import { IconFolder16 } from "./icons/folder";
+import { IconFolders16 } from "./icons/folders";
+import { IconAndroid16 } from "./icons/android";
+import { ResizeHandle } from "./resizeHandle";
+import { IconIos16 } from "./icons/ios";
+import { ScaleExport } from "./scaleExport";
 
-const MaxPixelSize = 12e6;
+const MaxPixelSize = 2e6;
 
 function zipFiles(
   zip: JSZip,
   webp: { data: Blob; scale: RenderedImageScale }[],
   baseName: string,
-  isAndroidExport: boolean,
+  exportStructure: Settings["exportStructure"],
   replacement: string,
 ): JSZip {
   webp.forEach(({ data, scale }) => {
-    const fileName = isAndroidExport
-      ? fileNameAndroid(scale, baseName)
-      : fileNameWeb(scale, baseName, replacement);
-
-    zip.file(`${fileName}.webp`, data);
+    let fileName: string | undefined;
+    switch (exportStructure) {
+      case "android":
+        fileName = fileNameAndroid(scale, baseName);
+        break;
+      case "ios":
+        fileName = fileNameIos(scale, baseName);
+        break;
+      case "web":
+        fileName = fileNameWeb(scale, baseName, replacement);
+        break;
+      case "flat":
+        fileName = fileNameFlat(scale, baseName, replacement);
+        break;
+    }
+    if (fileName) zip.file(`${fileName}.webp`, data);
   });
+  // Currently xcode won't include .webp files in the assets folder
+  // if (exportStructure === "ios") {
+  //   zip.file(
+  //     `${baseName}.imageset/Contents.json`,
+  //     iosContentJson(
+  //       baseName,
+  //       webp.map(({ scale }) => ({ scale })),
+  //     ),
+  //   );
+  // }
   return zip;
 }
 
@@ -72,14 +97,14 @@ function downloadFile(data: Blob, name: string) {
 }
 
 async function compressImage(data: Uint8Array, quality: number): Promise<Blob> {
-  const canvas = document.createElement("canvas") as HTMLCanvasElement;
+  const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  const blob = new Blob([data], { type: "image/png" });
+  const blob = new Blob([new Uint8Array(data)], { type: "image/png" });
   const image = new Image();
 
   image.src = URL.createObjectURL(blob);
   return await new Promise<Blob>((resolve, reject) => {
-    image.onload = async () => {
+    image.onload = () => {
       canvas.width = image.width;
       canvas.height = image.height;
       ctx?.drawImage(image, 0, 0);
@@ -87,7 +112,7 @@ async function compressImage(data: Uint8Array, quality: number): Promise<Blob> {
       canvas.toBlob(
         (blob) => {
           if (blob) resolve(blob);
-          else reject("Couldn't create image");
+          else reject(new Error("Couldn't create image"));
         },
         "image/webp",
         quality,
@@ -97,29 +122,21 @@ async function compressImage(data: Uint8Array, quality: number): Promise<Blob> {
 }
 
 function Preview(settings: Settings) {
-  const [useAndroidExport, setUseAndroidExport] = useState(
-    settings.useAndroidExport,
-  );
-  const [exportScales, setExportScales] = useState(
-    new Map(settings.selectedExportScales),
-  );
-  const [exportQuality, setExportQuality] = useState<number>(
-    settings.exportQuality,
-  );
-  const [namingConvention, setNamingConvention] =
-    useState<SettingsNamingConvention>(settings.namingConvention);
+  const [exportStructure, setExportStructure] = useState<Settings["exportStructure"]>(settings.exportStructure);
+  const [exportScales, setExportScales] = useState(new Set(settings.selectedExportScalesV2));
+  const [exportQuality, setExportQuality] = useState<number>(settings.exportQuality);
+  const [namingConvention, setNamingConvention] = useState<SettingsNamingConvention>(settings.namingConvention);
+  const [windowSize, setWindowSize] = useState<WindowSize>(settings.pluginWindowSize);
 
   useEffect(() => {
     emit<SaveSettings>("SAVE_SETTINGS", {
-      useAndroidExport: useAndroidExport,
+      pluginWindowSize: windowSize,
+      exportStructure: exportStructure,
       exportQuality: exportQuality,
-      selectedExportScales: Array.from(exportScales, ([scale, checked]) => [
-        scale,
-        checked,
-      ]),
+      selectedExportScalesV2: Array.from(exportScales),
       namingConvention: namingConvention,
     });
-  }, [useAndroidExport, exportScales, exportQuality, namingConvention]);
+  }, [exportStructure, windowSize, exportScales, exportQuality, namingConvention]);
 
   const [showExportWarning, setShowExportWarning] = useState(false);
   const [originalFileName, setOriginalFileName] = useState("");
@@ -128,6 +145,11 @@ function Preview(settings: Settings) {
   const [previewImages, setPreviewImages] = useState<Uint8Array[]>([]);
   const [inProgress, setInProgress] = useState(false);
 
+  function handleResize(size: WindowSize) {
+    setWindowSize(size);
+    emit<Resize>("RESIZE", size);
+  }
+
   function isExportButtonDisabled(): boolean {
     let anyChecked = false;
     exportScales.forEach((checked) => {
@@ -135,12 +157,7 @@ function Preview(settings: Settings) {
         anyChecked = true;
       }
     });
-    return (
-      setSelectedNodes.length == 0 ||
-      fileName.length == 0 ||
-      inProgress ||
-      !anyChecked
-    );
+    return setSelectedNodes.length == 0 || fileName.length == 0 || inProgress || !anyChecked;
   }
 
   useEffect(() => {
@@ -150,12 +167,9 @@ function Preview(settings: Settings) {
   useEffect(() => {
     const deleteSelectionChangedHandler = on<SelectionChanged>(
       "SELECTION_CHANGED",
-      function (
-        totalPixelSize: number,
-        nodes: SelectedNode[],
-        previewImages: Uint8Array[],
-      ) {
-        setShowExportWarning(totalPixelSize > MaxPixelSize);
+      function (totalPixelSize: number, nodes: SelectedNode[], previewImages: Uint8Array[]) {
+        console.log("Selection changed", totalPixelSize);
+        setShowExportWarning(totalPixelSize * exportScales.size > MaxPixelSize);
         setSelectedNodes(nodes);
         if (nodes.length === 0) {
           setPreviewImages([]);
@@ -171,7 +185,7 @@ function Preview(settings: Settings) {
     const deleteRenderResultHandler = on<RenderResultHandler>(
       "RENDER_RESULT",
       function (nodes: { name: string; images: RenderedImage[] }[]) {
-        (async () => {
+        void (async () => {
           const quality = exportQuality / 100.0;
 
           if (nodes.length == 1 && nodes[0].images.length == 1) {
@@ -194,27 +208,16 @@ function Preview(settings: Settings) {
               );
 
               // mimic the existing behavior - with only one node, the input is considered
-              const name =
-                nodes.length == 1
-                  ? fileName
-                  : convertFileName(node.name, namingConvention);
+              const name = nodes.length == 1 ? fileName : convertFileName(node.name, namingConvention);
 
-              zipFiles(
-                zip,
-                webps,
-                name,
-                useAndroidExport,
-                namingConvention.replacement,
-              );
+              zipFiles(zip, webps, name, exportStructure, namingConvention.replacement);
             }
 
             setInProgress(false);
 
             await downloadZip(
               zip,
-              nodes.length == 1
-                ? fileName
-                : `export_${new Date().toISOString().replace(".", "-")}`,
+              nodes.length == 1 ? fileName : `export_${new Date().toISOString().replace(".", "-")}`,
             );
           }
         })();
@@ -240,15 +243,9 @@ function Preview(settings: Settings) {
     preview = (
       <div className={styles.preview_stack}>
         {previewImages.toReversed().map((image, index) => {
-          const blob = new Blob([image], { type: "image/png" });
+          const blob = new Blob([new Uint8Array(image)], { type: "image/png" });
           return (
-            <img
-              key={index}
-              id={"img-preview"}
-              alt={""}
-              src={URL.createObjectURL(blob)}
-              className={styles.preview}
-            />
+            <img key={index} id={"img-preview"} alt={""} src={URL.createObjectURL(blob)} className={styles.preview} />
           );
         })}
       </div>
@@ -256,13 +253,13 @@ function Preview(settings: Settings) {
   } else {
     preview = (
       <div class={styles.preview_no_selection}>
-        <IconFrame32 />
+        <IconFrame24 />
         <div>Select node(s)</div>
       </div>
     );
   }
 
-  const options: Array<DropdownOption> = [
+  const transformOptions: DropdownOption[] = [
     {
       text: "Preserve Layer Name",
       value: "no-transform",
@@ -277,201 +274,203 @@ function Preview(settings: Settings) {
     },
   ];
 
-  function setExportScale(scale: RenderedImageScale, checked: boolean) {
-    setExportScales((prev) => new Map([...prev, [scale, checked]]));
-  }
+  const folderStructureOptions: SegmentedControlOption[] = [
+    {
+      children: <IconFolder16 />,
+      value: "flat",
+    },
+    {
+      children: <IconFolders16 />,
+      value: "web",
+    },
+    {
+      children: <IconAndroid16 />,
+      value: "android",
+    },
+    {
+      children: <IconIos16 />,
+      value: "ios",
+    },
+  ];
 
   return (
-    <Container space="medium">
-      <VerticalSpace space="medium" />
-      <MiddleAlign style={"height: auto;"}>{preview}</MiddleAlign>
-      <VerticalSpace space="large" />
-      {selectedNodes.length > 4 && !showExportWarning ? (
-        <>
-          <Banner icon={<IconInfo32 />}>
-            Too many or large nodes may freeze the UI during export.
-          </Banner>
-          <VerticalSpace space="small" />
-        </>
-      ) : null}
-      {showExportWarning ? (
-        <>
-          <Banner icon={<IconWarning32 />} variant="warning">
-            Exporting may freeze the UI. Try selecting fewer or smaller nodes.
-          </Banner>
-          <VerticalSpace space="small" />
-        </>
-      ) : null}
-      {selectedNodes.length <= 1 ? (
-        <>
-          <Textbox
-            placeholder="Enter filename"
-            variant="border"
-            onInput={(event) => {
-              const name = event.currentTarget.value;
-              // override with user input
-              setOriginalFileName(name);
-              setFileName(name);
-            }}
-            value={fileName}
-          />
-          <VerticalSpace space="small" />
-        </>
-      ) : null}
-      <Button
-        fullWidth
-        secondary
-        loading={inProgress}
-        disabled={isExportButtonDisabled()}
-        onClick={() => clickDownloadZip()}
-      >
-        {selectedNodes.length <= 1
-          ? "Export"
-          : `Export ${selectedNodes.length} images`}
-      </Button>
-      <VerticalSpace space="large" />
-      <VerticalSpace space="small" />
-      <Text>
-        <Bold>Quality and Resolution</Bold>
-      </Text>
-      <VerticalSpace space="medium" />
-      <div className={styles.quality}>
-        <RangeSlider
-          minimum={10}
-          maximum={100}
-          increment={10}
-          onNumericValueInput={(value) =>
-            value ? setExportQuality(value) : null
-          }
-          value={exportQuality.toString()}
-        />
-        <TextboxNumeric
-          integer
-          variant="border"
-          minimum={10}
-          maximum={100}
-          onNumericValueInput={(value) =>
-            value ? setExportQuality(value) : null
-          }
-          suffix="%"
-          value={`${exportQuality}%`}
-        />
-      </div>
-      <VerticalSpace space="small" />
-      <Inline space="small">
-        <ScaleExportToggle
-          checked={exportScales.get(1) ?? false}
-          scale={1}
-          setScale={setExportScale}
-        />
-        <ScaleExportToggle
-          checked={exportScales.get(1.5) ?? false}
-          scale={1.5}
-          setScale={setExportScale}
-        />
-        <ScaleExportToggle
-          checked={exportScales.get(2) ?? false}
-          scale={2}
-          setScale={setExportScale}
-        />
-        <ScaleExportToggle
-          checked={exportScales.get(3) ?? false}
-          scale={3}
-          setScale={setExportScale}
-        />
-        <ScaleExportToggle
-          checked={exportScales.get(4) ?? false}
-          scale={4}
-          setScale={setExportScale}
-        />
-      </Inline>
-      <VerticalSpace space="small" />
-
+    <div className={styles.main}>
+      <Container space="medium">
+        <VerticalSpace space="medium" />
+        <MiddleAlign style={"height: auto;"}>{preview}</MiddleAlign>
+        <VerticalSpace space="large" />
+        {selectedNodes.length > 4 && !showExportWarning ? (
+          <>
+            <Banner icon={<IconInfoSmall24 />}>Too many or large nodes may freeze the UI during export.</Banner>
+            <VerticalSpace space="small" />
+          </>
+        ) : null}
+        {showExportWarning ? (
+          <>
+            <Banner icon={<IconWarningSmall24 />} variant="warning">
+              Exporting may freeze the UI. Try selecting fewer or smaller nodes.
+            </Banner>
+            <VerticalSpace space="small" />
+          </>
+        ) : null}
+        {selectedNodes.length <= 1 ? (
+          <>
+            <Textbox
+              placeholder="Enter filename"
+              onInput={(event) => {
+                const name = event.currentTarget.value;
+                // override with user input
+                setOriginalFileName(name);
+                setFileName(name);
+              }}
+              value={fileName}
+            />
+            <VerticalSpace space="small" />
+          </>
+        ) : null}
+        <Button fullWidth loading={inProgress} disabled={isExportButtonDisabled()} onClick={() => clickDownloadZip()}>
+          {selectedNodes.length <= 1 ? "Export" : `Export ${selectedNodes.length} images`}
+        </Button>
+        <VerticalSpace space="large" />
+        <Section heading="Quality">
+          <div className={styles.quality}>
+            <RangeSlider
+              minimum={10}
+              maximum={100}
+              increment={10}
+              onNumericValueInput={(value) => (value ? setExportQuality(value) : null)}
+              value={exportQuality.toString()}
+            />
+            <TextboxNumeric
+              integer
+              minimum={10}
+              maximum={100}
+              onNumericValueInput={(value) => (value ? setExportQuality(value) : null)}
+              suffix="%"
+              value={`${exportQuality}%`}
+            />
+          </div>
+        </Section>
+        <VerticalSpace space="medium" />
+      </Container>
       <Divider />
-      <VerticalSpace space="medium" />
-      <Text>
-        <Bold>Naming</Bold>
-      </Text>
-      <VerticalSpace space="medium" />
-      <div className={styles.naming}>
-        <Dropdown
-          onChange={(value) =>
-            setNamingConvention((v) => {
-              return {
-                transform: value.currentTarget
-                  .value as SettingsNamingConvention["transform"],
-                replacement: v.replacement,
-              };
+      <Container space="medium">
+        <Section heading="Folder Structure">
+          <div className={styles.structure}>
+            <SegmentedControl
+              onValueChange={(value) => setExportStructure(value as Settings["exportStructure"])}
+              value={exportStructure}
+              options={folderStructureOptions}
+            />
+          </div>
+        </Section>
+        <Section
+          heading="Resolution"
+          icon={<IconPlus24 />}
+          onClick={() =>
+            setExportScales((prev) => {
+              const maxScale = Math.max(...Array.from(prev), 0);
+              return new Set([...prev, maxScale + 1]);
             })
           }
-          options={options}
-          value={namingConvention.transform}
-          variant="border"
-        />
-        <Textbox
-          onChange={(value) =>
-            setNamingConvention((v) => {
-              return {
-                transform: v.transform,
-                replacement: value.currentTarget.value,
-              };
-            })
-          }
-          value={namingConvention.replacement}
-          variant="border"
-          placeholder="Divider"
-        />
-      </div>
-      <VerticalSpace space="small" />
-
+        >
+          <div className={styles.row}>
+            {Array.from(exportScales).map((scale, index) => (
+              <ScaleExport
+                key={`${index}_${scale}`}
+                defaultValue={scale}
+                structure={exportStructure}
+                onClickRemove={() => {
+                  setExportScales((prev) => {
+                    const newScales = new Set(prev);
+                    newScales.delete(scale);
+                    return newScales;
+                  });
+                }}
+                onValueChange={(v) => {
+                  if (exportScales.has(v)) return false;
+                  setExportScales((prev) => {
+                    const newScales = Array.from(prev);
+                    newScales[index] = v;
+                    return new Set(newScales);
+                  });
+                  return true;
+                }}
+              />
+            ))}
+          </div>
+        </Section>
+        <VerticalSpace space="medium" />
+      </Container>
       <Divider />
-      <VerticalSpace space="medium" />
-      <Text>
-        <Bold>Folder Structure</Bold>
-      </Text>
-      <VerticalSpace space="medium" />
-      <Toggle
-        onValueChange={(checked) => setUseAndroidExport(checked)}
-        value={useAndroidExport}
-      >
-        <Text>Export for Android</Text>
-      </Toggle>
-      <VerticalSpace space="extraLarge" />
-      {DonateLogo()}
-      <VerticalSpace space="medium" />
-    </Container>
+      <Container space="medium">
+        <Section heading="Naming">
+          <div className={styles.naming}>
+            <Dropdown
+              onChange={(value) =>
+                setNamingConvention((v) => {
+                  return {
+                    transform: value.currentTarget.value as SettingsNamingConvention["transform"],
+                    replacement: v.replacement,
+                  };
+                })
+              }
+              options={transformOptions}
+              value={namingConvention.transform}
+            />
+            <Textbox
+              onChange={(value) =>
+                setNamingConvention((v) => {
+                  return {
+                    transform: v.transform,
+                    replacement: value.currentTarget.value,
+                  };
+                })
+              }
+              value={namingConvention.replacement}
+              placeholder="Divider"
+            />
+          </div>
+        </Section>
+        <VerticalSpace space="medium" />
+        <Banner icon={<IconInfoSmall24 />}>
+          We export multiple images bundled as a ZIP. It’s a technical requirement we can’t avoid.
+        </Banner>
+        <VerticalSpace space="extraLarge" />
+        {DonateLogo()}
+        <VerticalSpace space="medium" />
+      </Container>
+      <ResizeHandle onResize={handleResize} />
+    </div>
   );
 }
 
-type ScaleExportToggleProps = {
-  checked: boolean;
-  scale: RenderedImageScale;
-  setScale: (scale: RenderedImageScale, checked: boolean) => void;
+interface SectionProps {
+  heading: string;
+  icon?: ComponentChildren;
+  onClick?: EventHandler.onClick<HTMLButtonElement>;
+  children: ComponentChildren;
+}
+
+const Section = ({ heading, icon, onClick, children }: SectionProps) => {
+  return (
+    <div>
+      <VerticalSpace space="medium" />
+      <div className={styles.column}>
+        <Text>
+          <Bold>{heading}</Bold>
+        </Text>
+        {icon && onClick && <IconButton onClick={onClick}>{icon}</IconButton>}
+      </div>
+      <VerticalSpace space="medium" />
+      {children}
+    </div>
+  );
 };
-
-function ScaleExportToggle({
-  checked,
-  scale,
-  setScale,
-}: ScaleExportToggleProps) {
-  return (
-    <Checkbox
-      onChange={(event) => setScale(scale, event.currentTarget.checked)}
-      value={checked}
-    >
-      <Text>{scale}x</Text>
-    </Checkbox>
-  );
-}
 
 function DonateLogo() {
   return (
-    <a
-      id={styles.donate}
-      href="https://ko-fi.com/webpgen"
-      target="_blank"
-      rel="noreferrer"
-    >
+    <a id={styles.donate} href="https://ko-fi.com/webpgen" target="_blank" rel="noreferrer">
       <img src={donateLogo} alt="Donate" />
       Donate
     </a>

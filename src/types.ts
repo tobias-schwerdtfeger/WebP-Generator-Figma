@@ -1,21 +1,36 @@
-export type RenderedImageScale = 1 | 1.5 | 2 | 3 | 4;
+export type RenderedImageScale = number;
 
-export type RenderedImage = {
+export interface RenderedImage {
   scale: RenderedImageScale;
   image: Uint8Array;
-};
+}
 
-export type SelectedNode = { id: string; name: string };
+export interface SelectedNode {
+  id: string;
+  name: string;
+}
 
-export type SettingsExportScales = [RenderedImageScale, boolean];
-export type SettingsNamingConvention = {
+export type SettingsExportScales = RenderedImageScale;
+export interface SettingsNamingConvention {
   transform: "lowercase" | "case-sensitive" | "no-transform";
   replacement: string;
-};
+}
 
-export type Settings = {
+export interface WindowSize {
+  w: number;
+  h: number;
+}
+
+export interface SettingsOld {
   useAndroidExport: boolean;
+  selectedExportScales: [number, boolean][];
+  useOptimizedSize: boolean;
+}
+
+export interface Settings {
+  pluginWindowSize: WindowSize;
+  exportStructure: "android" | "ios" | "web" | "flat";
   exportQuality: number;
-  selectedExportScales: SettingsExportScales[];
+  selectedExportScalesV2: SettingsExportScales[];
   namingConvention: SettingsNamingConvention;
-};
+}
