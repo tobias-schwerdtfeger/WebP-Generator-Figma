@@ -308,7 +308,7 @@ function Preview(settings: Settings) {
         {showExportWarning ? (
           <>
             <Banner icon={<IconWarningSmall24 />} variant="warning">
-              Exporting may freeze the UI. Try selecting fewer or smaller nodes.
+              Hold on, exporting can freeze things for a bit. Try fewer pics or just wait a moment.
             </Banner>
             <VerticalSpace space="small" />
           </>
